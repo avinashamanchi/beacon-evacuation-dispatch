@@ -116,6 +116,29 @@ def all_hazards() -> list[dict]:
 def clear_hazards():
     with _lock:
         _hazards.clear()
+        _photos.clear()
+
+
+# Photos, newest last. Grouped by street they stitch into a progression.
+_photos: list[dict] = []
+
+
+def add_photo(entry: dict) -> dict:
+    with _lock:
+        entry = dict(entry)
+        entry["at"] = now_iso()
+        _photos.append(entry)
+        return entry
+
+
+def photos_for(street: str) -> list[dict]:
+    with _lock:
+        return [dict(p) for p in _photos if p.get("street") == street]
+
+
+def all_photos() -> list[dict]:
+    with _lock:
+        return [dict(p) for p in _photos]
 
 
 # --- Learning substrate -----------------------------------------------------
@@ -173,6 +196,7 @@ def reset_all():
         _cases.clear()
         _escalations.clear()
         _hazards.clear()
+        _photos.clear()
         _fire["eta_minutes"] = FIRE_ETA_MINUTES
         _fire["perimeter_step"] = 0
 

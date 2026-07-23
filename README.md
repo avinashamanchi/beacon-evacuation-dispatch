@@ -136,6 +136,47 @@ Confirmed hazards reach dispatch through exactly one named, auditable constant
 rule**, and the receipt says so explicitly. The intake form warns the sender, and
 the map paints each street clear / reported / impassable.
 
+## Photo intake — a picture is a report
+
+You can't FaceTime the firefighters. So a photo is a first-class ticket: it
+flows through the *same* audited pipeline, and the sender gets a plan back.
+
+**Location, in order of trust** — because a panicking person shouldn't have to
+type an address (Anthony Mitchell repeated his across three calls):
+
+| source | how |
+|---|---|
+| `exif_gps` | GPS from photo metadata, resolved to the nearest street |
+| `street_sign_ocr` | messaging apps strip EXIF constantly — vision reads the sign instead |
+| typed text | the existing path |
+
+GPS outside the incident area is reported as `exif_gps_off_map` rather than
+silently snapped to a street.
+
+**Analysis, honest about which ran:** OpenAI vision when a key is configured;
+otherwise a *real* offline fire-glow colour measurement — `"offline colour
+analysis — 100% of frame in fire-glow range"` — not a canned answer. It declares
+its own low confidence and is labelled in the receipt.
+
+Photo-sourced hazards are **self-corroborating**: an image showing flames across
+the roadway confirms on one report, where text needs two witnesses. The hazard is
+filed *before* routing, so the sender's own evidence reaches the deterministic
+pipeline. A photo of flames with GPS, and nothing typed at all, routes to
+`transport_assist` at `18 − 35 = −17`.
+
+**Timelines** stitch every photo of a street chronologically — `19:50 flames →
+19:56 flames → 20:02 smoke` — so dispatch sees fire progression, not one frame.
+
+**The evacuation plan** (`app/evac_plan.py`) is deterministic set logic over the
+hazard network: what's confirmed impassable, which way gains distance from the
+fire origin, and whether to move or stay put. Telling someone which way to run is
+exactly the decision that must be reproducible — **no generated directions.**
+
+> **Not built, deliberately:** building floor plans / interior exits. No API
+> returns residential blueprints; indoor maps cover a handful of opted-in malls
+> and airports. In a wildfire the answer isn't which door — it's which road is
+> still passable, which is what the hazard network already computes.
+
 ## The calibration ledger — what learns, and what never does
 
 BEACON has a feedback loop, but the boundary is the point:

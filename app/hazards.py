@@ -39,12 +39,18 @@ def _age_minutes(iso: str) -> float:
         return 0.0
 
 
-def report(street: str, kind: str, case_id: str, note: str = ""):
-    """Record a field report against a known street. Unknown streets ignored."""
+def report(street: str, kind: str, case_id: str, note: str = "", via_photo: bool = False):
+    """Record a field report against a known street. Unknown streets ignored.
+
+    Photo-sourced reports are self-corroborating: an image showing flames across
+    the roadway is materially stronger evidence than one stranger's text claim,
+    so it confirms on its own rather than waiting for a second witness.
+    """
     street = (street or "").lower()
     if street not in STREETS:
         return None
-    return state.add_hazard_report(street, kind, case_id, note)
+    tag = f"{note} [photo evidence]".strip() if via_photo else note
+    return state.add_hazard_report(street, kind, case_id, tag)
 
 
 def report_from_case(case_id: str, facts) -> str | None:
@@ -71,9 +77,10 @@ def status(street: str) -> dict:
     fresh = [r for r in reports if _age_minutes(r["at"]) <= STALE_AFTER_MINUTES]
     # Distinct cases only — one panicking person filing five tickets is one witness.
     witnesses = {r["case_id"] for r in fresh}
+    has_photo = any("[photo evidence]" in (r.get("note") or "") for r in fresh)
     if not fresh:
         label = "stale"
-    elif len(witnesses) >= CONFIRM_THRESHOLD:
+    elif len(witnesses) >= CONFIRM_THRESHOLD or has_photo:
         label = "confirmed"
     else:
         label = "reported"

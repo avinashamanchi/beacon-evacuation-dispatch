@@ -65,6 +65,27 @@
   }
   .hazard b{ display:block; margin-bottom:2px; }
   .chip.shelter{ background:#D9E7F5; color:#2B5D8F; }
+  .photo-row{ display:flex; gap:8px; align-items:center; margin-bottom:14px; }
+  .photo-btn{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:7px;
+    border:1px dashed #CFC7B8; border-radius:4px; padding:10px; cursor:pointer;
+    font-size:13px; color:#6E675B; background:#FDFCF9;
+  }
+  .photo-btn:hover{ border-color:#C9A227; color:#4A443A; }
+  .photo-btn input{ display:none; }
+  .thumb{ width:46px; height:46px; object-fit:cover; border-radius:4px; border:1px solid #DDD6C9; }
+  .plan{
+    margin-top:10px; background:#fff; border:1px solid #DDD6C9;
+    border-left:3px solid #C2410C; border-radius:4px; padding:11px 13px;
+  }
+  .plan .hl{ font-weight:600; font-size:13.5px; color:#7A2E0E; margin-bottom:6px; }
+  .plan ul{ margin:0; padding-left:16px; }
+  .plan li{ font-size:12.5px; color:#4A443A; line-height:1.5; margin-bottom:3px; }
+  .plan .basis{ font-size:10px; color:#A39A88; margin-top:7px; letter-spacing:.04em; }
+  .evidence{
+    margin-top:8px; font-size:11.5px; color:#6E675B; background:#F6F4EF;
+    border-radius:4px; padding:7px 9px; font-family:ui-monospace,monospace;
+  }
   .fine{ text-align:center; font-size:11px; color:#A39A88; margin-top:14px; }
 </style>
 </head>
@@ -83,7 +104,14 @@
           <label for="name">Your name</label>
           <input id="name" type="text" autocomplete="name" placeholder="Full name" />
           <label for="message">Message</label>
-          <textarea id="message" rows="5" required placeholder="How can we help?"></textarea>
+          <textarea id="message" rows="5" placeholder="How can we help?"></textarea>
+          <div class="photo-row">
+            <label class="photo-btn" id="photoLabel">
+              <span>📷 Add a photo</span>
+              <input id="photo" type="file" accept="image/jpeg,image/png" capture="environment" />
+            </label>
+            <img id="thumb" class="thumb" alt="" hidden />
+          </div>
           <button id="send" type="submit">Send message</button>
         </form>
         <div id="result" class="ok"></div>
@@ -105,13 +133,13 @@
       accessible_shelter: ['Accessible shelter intake', 'shelter'],
     };
 
-    function renderOutcome(c) {
+    function renderOutcome(c, planHtml) {
       const box = document.getElementById('result');
       const caseLine = `<div style="margin-top:8px"><a href="/dashboard">case #${esc(c.id)} · dispatch dashboard</a></div>`;
       // Live hazard advisory built from what OTHER people have reported.
       const hz = c.hazard_advisory;
       const hazardLine = hz ? `<div class="hazard">
-          <b>⚠ ${esc(hz.street.replace(/\b\w/g, m => m.toUpperCase()))} — ${esc(hz.label)}</b>
+          <b>⚠ ${esc(hz.street.split(' ').map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(' '))} — ${esc(hz.label)}</b>
           <div>${hz.impassable
             ? `Confirmed impassable by ${hz.fresh} separate reports. Do not attempt this route.`
             : `Reported by ${hz.fresh} person so far — unconfirmed. Treat with caution.`}</div>
@@ -120,7 +148,7 @@
         box.className = 'ok show';
         box.innerHTML = `<b>Answered instantly</b>
           <div class="reply"><div class="from">Meridian Mutual · automated reply</div>${esc(c.auto_answer)}</div>
-          ${hazardLine}${caseLine}`;
+          ${planHtml || ''}${hazardLine}${caseLine}`;
       } else if (TEAM_LABEL[c.dispatch_path]) {
         const [label, cls] = TEAM_LABEL[c.dispatch_path];
         const loc = c.facts && c.facts.location_text ? ' to ' + esc(c.facts.location_text) : '';
@@ -128,33 +156,70 @@
         box.innerHTML = `<b>Help is being dispatched${loc}</b>
           <div>Your message was routed on what you need — not how it sounds.</div>
           <span class="chip ${cls}">${esc(label)} · crew paged</span>
-          ${hazardLine}${caseLine}`;
+          ${planHtml || ''}${hazardLine}${caseLine}`;
       } else {
         box.className = 'ok show';
         box.innerHTML = `<b>Message received — case #${esc(c.id)}</b>
           <div>A specialist is reviewing your message.</div>
-          ${hazardLine}${caseLine}`;
+          ${planHtml || ''}${hazardLine}${caseLine}`;
       }
+    }
+
+    const photoInput = document.getElementById('photo');
+    photoInput.addEventListener('change', () => {
+      const f = photoInput.files[0];
+      const thumb = document.getElementById('thumb');
+      const lbl = document.getElementById('photoLabel').firstElementChild;
+      if (f) {
+        thumb.src = URL.createObjectURL(f); thumb.hidden = false;
+        lbl.textContent = '📷 ' + (f.name.length > 22 ? f.name.slice(0, 22) + '…' : f.name);
+      } else { thumb.hidden = true; lbl.textContent = '📷 Add a photo'; }
+    });
+
+    function renderPlan(d) {
+      const p = d.plan, pf = d.photo_facts, loc = d.location;
+      if (!p) return '';
+      const steps = (p.steps || []).map(s => `<li>${esc(s)}</li>`).join('');
+      const src = { exif_gps: 'GPS from photo metadata', street_sign_ocr: 'street sign read from photo',
+                    exif_gps_off_map: 'GPS outside the incident area', no_exif: 'no location metadata' };
+      const ev = pf ? `<div class="evidence">
+          location: ${esc(src[loc.source] || loc.source)}${loc.street ? ' → ' + esc(p.located_at ? p.located_at : loc.street) : ''}<br>
+          image: ${esc(pf.description || pf.analysis_source)}
+        </div>` : '';
+      return `<div class="plan"><div class="hl">${esc(p.headline)}</div>
+        <ul>${steps}</ul>
+        <div class="basis">${esc(p.basis)}</div></div>${ev}`;
     }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('send');
       const msg = document.getElementById('message').value.trim();
-      if (!msg) return;
+      if (!msg && !photoInput.files[0]) return;
       btn.disabled = true; btn.textContent = 'Sending…';
       try {
-        const res = await fetch('/api/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: document.getElementById('name').value.trim() || 'Anonymous',
-            message: msg,
-          }),
-        });
-        if (!res.ok) throw new Error('service busy — try again in a moment');
-        renderOutcome(await res.json());
+        const nm = document.getElementById('name').value.trim() || 'Anonymous';
+        const file = photoInput.files[0];
+        let res, data;
+        if (file) {
+          const fd = new FormData();
+          fd.append('file', file); fd.append('name', nm); fd.append('message', msg);
+          res = await fetch('/api/photo', { method: 'POST', body: fd });
+          if (!res.ok) throw new Error((await res.json()).error || 'upload failed');
+          data = await res.json();
+          renderOutcome({ ...data.case, hazard_advisory: data.hazard_advisory }, renderPlan(data));
+        } else {
+          res = await fetch('/api/submit', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: nm, message: msg }),
+          });
+          if (!res.ok) throw new Error('service busy — try again in a moment');
+          data = await res.json();
+          renderOutcome(data, '');
+        }
         form.reset();
+        document.getElementById('thumb').hidden = true;
+        document.getElementById('photoLabel').firstElementChild.textContent = '📷 Add a photo';
       } catch (err) {
         alert('Could not send: ' + (err.message || err));
       } finally {

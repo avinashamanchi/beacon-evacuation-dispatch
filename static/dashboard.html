@@ -172,6 +172,22 @@
   }
   .receipt .actions button:hover{ border-color:#221B12; }
 
+  /* photo evidence filmstrip */
+  .film{ margin-bottom:10px; }
+  .film .hdr{ display:flex; justify-content:space-between; align-items:baseline;
+    font-size:11px; margin-bottom:4px; }
+  .film .hdr b{ font-size:12px; }
+  .film .hdr .st{ font-family:'IBM Plex Mono',monospace; font-size:10px; }
+  .film .hdr .st.impass{ color:var(--ember); }
+  .film .hdr .st.rep{ color:var(--amber); }
+  .strip{ display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; }
+  .strip figure{ flex:0 0 auto; width:88px; }
+  .strip img{ width:88px; height:62px; object-fit:cover; border-radius:2px;
+    border:1px solid var(--line); display:block; }
+  .strip figcaption{ font-family:'IBM Plex Mono',monospace; font-size:9px;
+    color:var(--faint); margin-top:2px; line-height:1.3; }
+  .strip .hot{ border-color:var(--ember); }
+
   /* calibration ledger */
   .cal{ padding:8px 12px 12px; font-size:12px; }
   .cal .top{ display:flex; gap:18px; align-items:baseline; margin-bottom:8px; }
@@ -315,6 +331,14 @@
         </div>
         <div class="scatter-wrap"><svg id="scatter" viewBox="0 0 560 190" role="img"
           aria-label="Scatter of message tone versus computed need"></svg></div>
+      </div>
+
+      <div class="panel" id="filmPanel" hidden>
+        <div class="panel-h">
+          <span class="t disp">Photo evidence</span>
+          <span class="s">field images stitched by street, oldest first</span>
+        </div>
+        <div id="films" style="padding:8px 12px 12px"></div>
       </div>
 
       <div class="panel">

@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from typing import Literal, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -23,7 +23,7 @@ from app import config, state
 from app.analytics import attach_ranks, compute_metrics, panic_score
 from app.extraction import extract_facts
 from app.guide_answer import compose_answer
-from app import hazards, learning
+from app import evac_plan, hazards, learning, vision
 from app.router_rules import route
 from app.seeds import DEMO_TICKETS, NOISE_TICKETS, find_street, pin_for
 from app.security import (
@@ -471,6 +471,122 @@ def observe(case_id: str, body: Observation):
         state.add_timeline(case_id, f"Fact corrected: {field} "
                                     f"{facts.get(field)!r} -> {should_be!r}")
     return {"recorded": True, "case": state.get_case(case_id)}
+
+
+UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+@app.post("/api/photo")
+async def upload_photo(file: UploadFile = File(...), name: str = Form("Anonymous"),
+                       message: str = Form("")):
+    """A photo IS a report. EXIF gives the location, vision gives the facts, the
+    hazard network gets both, and the sender gets a deterministic plan back."""
+    data = await file.read(vision.MAX_PHOTO_BYTES + 1)
+    if len(data) > vision.MAX_PHOTO_BYTES:
+        return JSONResponse(status_code=413, content={"error": "photo too large (max 8MB)"})
+    kind = vision.sniff_type(data)
+    if not kind:
+        return JSONResponse(status_code=415,
+                            content={"error": "only JPEG or PNG photos are accepted"})
+
+    loc = vision.locate(data)
+    pfacts = vision.analyze(data)
+
+    # Street sign OCR is the fallback when EXIF was stripped in transit.
+    street = loc["street"]
+    if not street and pfacts.street_sign_text:
+        street, _ = find_street(pfacts.street_sign_text)
+        if street:
+            loc = {**loc, "street": street, "source": "street_sign_ocr"}
+
+    # Build a text message so the photo flows through the SAME audited pipeline.
+    parts = [sanitize_text(message)[:MAX_MESSAGE_LEN]] if message else []
+    if pfacts.visible_flames:
+        parts.append("There are visible flames.")
+    if pfacts.road_blocked:
+        parts.append("The road is blocked.")
+    if pfacts.heavy_smoke:
+        parts.append("Heavy smoke.")
+    if street:
+        parts.append(f"Location {street.title()}.")
+    synthesized = " ".join(parts) or "Photo submitted from the evacuation area."
+
+    # File the hazard BEFORE routing, so the sender's own photo evidence reaches
+    # the deterministic pipeline instead of arriving too late to matter.
+    if street and (pfacts.road_blocked or pfacts.visible_flames):
+        hazards.report(street, "fire_active" if pfacts.visible_flames else "road_blocked",
+                       f"photo:{uuid4().hex[:8]}", note="photo evidence", via_photo=True)
+
+    case = process_message(name, synthesized)
+
+    # Persist the image so the street timeline can stitch it.
+    fname = f"{case['id']}.{ 'jpg' if kind == 'jpeg' else 'png' }"
+    try:
+        with open(os.path.join(UPLOAD_DIR, fname), "wb") as fh:
+            fh.write(data)
+    except OSError as exc:
+        state.add_timeline(case["id"], f"Photo write failed ({exc!r})")
+
+    photo = state.add_photo({
+        "case_id": case["id"], "street": street, "url": f"/static/uploads/{fname}",
+        "source": loc["source"], "taken_at": loc.get("taken_at"),
+        "lat": loc.get("lat"), "lng": loc.get("lng"),
+        "facts": pfacts.model_dump(), "requester": case["requester_name"],
+    })
+    state.add_timeline(case["id"],
+                       f"Photo analysed via {pfacts.analysis_source}; location by {loc['source']}"
+                       + (f" -> {street}" if street else " (unresolved)"))
+
+    if street and (pfacts.road_blocked or pfacts.visible_flames):
+        state.add_timeline(case["id"],
+                           f"Photo filed as hazard evidence for {street} "
+                           f"(self-corroborating: confirmed on one image)")
+
+    facts_obj = _facts_obj(case)
+    plan = evac_plan.build(facts_obj, case["dispatch_path"], case["equation"])
+    return {"case": state.get_case(case["id"]), "photo": photo,
+            "photo_facts": pfacts.model_dump(), "location": loc, "plan": plan,
+            "hazard_advisory": hazards.advisory_for(
+                (case.get("facts") or {}).get("location_text", ""))}
+
+
+def _facts_obj(case: dict):
+    from app.extraction import ExtractedFacts
+    return ExtractedFacts(**(case.get("facts") or {}))
+
+
+@app.get("/api/plan/{case_id}")
+def get_plan(case_id: str):
+    """The evacuation plan for an existing case — deterministic, recomputed live
+    against the current hazard network."""
+    c = state.get_case(case_id)
+    if not c:
+        return JSONResponse(status_code=404, content={"error": "unknown_case"})
+    return evac_plan.build(_facts_obj(c), c["dispatch_path"], c["equation"])
+
+
+@app.get("/api/timeline/{street}")
+def street_timeline(street: str):
+    """Stitch every photo of one street into a chronological progression."""
+    key = sanitize_text(street).lower()[:40]
+    shots = sorted(state.photos_for(key), key=lambda p: p["at"])
+    return {"street": key, "status": hazards.status(key), "frames": shots,
+            "count": len(shots)}
+
+
+@app.get("/api/timelines")
+def all_timelines():
+    """Streets that have photo evidence, most-documented first."""
+    by: dict[str, list] = {}
+    for p in state.all_photos():
+        if p.get("street"):
+            by.setdefault(p["street"], []).append(p)
+    return {"streets": [
+        {"street": s, "count": len(v), "status": hazards.status(s),
+         "frames": sorted(v, key=lambda p: p["at"])}
+        for s, v in sorted(by.items(), key=lambda kv: -len(kv[1]))
+    ]}
 
 
 @app.get("/api/learning")

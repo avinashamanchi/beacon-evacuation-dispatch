@@ -112,7 +112,7 @@ def categorize(path: str, method: str):
         return "mutate"
     if path.startswith("/api/case/") and method in ("PATCH", "POST"):
         return "mutate"
-    if path == "/api/learning/approve":
+    if path in ("/api/learning/approve", "/api/photo"):
         return "mutate"
     if path.startswith("/api/"):
         return "read"

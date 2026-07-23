@@ -266,6 +266,33 @@ document.getElementById("modal").addEventListener("click", (e) => {
   if (e.target.id === "modal") closeModal();
 });
 
+// ---------- photo evidence filmstrips ----------
+const titleCase = (s) => (s || "").split(" ")
+  .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
+async function pollFilms() {
+  try {
+    const r = await fetch("/api/timelines");
+    if (!r.ok) return;
+    const d = await r.json();
+    const panel = document.getElementById("filmPanel");
+    panel.hidden = !d.streets.length;
+    document.getElementById("films").innerHTML = d.streets.map((s) => {
+      const cls = s.status.impassable ? "impass" : (s.status.status === "reported" ? "rep" : "");
+      const frames = s.frames.map((f, i) => {
+        const hot = f.facts && f.facts.visible_flames;
+        const t = (f.taken_at || f.at || "").slice(-8);
+        return `<figure><img class="${hot ? "hot" : ""}" src="${esc(f.url)}" alt="frame ${i + 1}">
+          <figcaption>${esc(t)}<br>${hot ? "flames" : (f.facts && f.facts.heavy_smoke ? "smoke" : "—")}</figcaption></figure>`;
+      }).join("");
+      return `<div class="film">
+        <div class="hdr"><b>${esc(titleCase(s.street))}</b>
+          <span class="st ${cls}">${esc(s.status.status)} · ${s.count} frame${s.count > 1 ? "s" : ""}</span></div>
+        <div class="strip">${frames}</div></div>`;
+    }).join("");
+  } catch (e) { /* keep last */ }
+}
+
 // ---------- calibration ledger ----------
 function renderLearning(d) {
   const s = d.scorecard || {};
@@ -426,6 +453,8 @@ async function poll() {
 setInterval(tickClock, 1000);
 setInterval(poll, 2000);
 setInterval(pollLearning, 6000);
+setInterval(pollFilms, 5000);
 tickClock();
 poll();
 pollLearning();
+pollFilms();

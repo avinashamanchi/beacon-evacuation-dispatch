@@ -16,3 +16,6 @@ __pycache__/
 # OS / logs
 .DS_Store
 *.log
+
+# Uploaded photos (runtime)
+static/uploads/

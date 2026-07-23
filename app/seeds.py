@@ -82,6 +82,46 @@ DEMO_TICKETS = {
 }
 
 
+# --- Fictional geographic frame ---------------------------------------------
+# Cedar Canyon does not exist. These are SYNTHETIC anchor coordinates chosen so
+# that EXIF GPS from a photo can be resolved to a street in the demo town. They
+# are not, and must not be presented as, a real place.
+ANCHOR_LAT, ANCHOR_LNG = 34.9000, -118.9000   # NW corner of the fictional map
+SPAN_LAT, SPAN_LNG = 0.036, 0.043             # ~4 km box
+MAX_INCIDENT_KM = 12.0                        # beyond this, photo is off-map
+
+
+def street_latlng(name: str):
+    c = STREETS.get(name)
+    if not c:
+        return None
+    return (ANCHOR_LAT - (c["y"] / 100.0) * SPAN_LAT,
+            ANCHOR_LNG + (c["x"] / 100.0) * SPAN_LNG)
+
+
+def _km_between(a, b):
+    """Equirectangular approximation — plenty accurate across a 4 km town."""
+    import math
+    lat1, lng1 = a
+    lat2, lng2 = b
+    x = math.radians(lng2 - lng1) * math.cos(math.radians((lat1 + lat2) / 2))
+    y = math.radians(lat2 - lat1)
+    return math.hypot(x, y) * 6371.0
+
+
+def nearest_street(lat: float, lng: float):
+    """Resolve GPS to the nearest known street. Returns (name, km) or (None, km)
+    when the photo was taken outside the incident area."""
+    best, best_km = None, float("inf")
+    for name in STREETS:
+        d = _km_between((lat, lng), street_latlng(name))
+        if d < best_km:
+            best, best_km = name, d
+    if best_km > MAX_INCIDENT_KM:
+        return None, best_km
+    return best, best_km
+
+
 def find_street(location_text: str):
     """Return (name, coords) for the first street named in the text, else (None, None)."""
     lt = (location_text or "").lower()
