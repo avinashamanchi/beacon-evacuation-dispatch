@@ -141,6 +141,7 @@ function render(data) {
     `${counts.standard || 0} standard · ${counts.auto_answered || 0} auto`;
 
   renderPins(data.cases);
+  renderHazards(data.hazards);
   drawScatter(data.cases);
 
   // Pager.
@@ -194,6 +195,10 @@ function openReceipt(id) {
     <div class="rule-line">${esc(c.rule_fired)}</div>
     ${eq ? `<div class="sec">EQUATION</div>
       <div class="eqbig ${eq.time_to_impact < 0 ? "neg" : ""}">fire ETA ${eq.fire_eta} − evac need ${eq.evac_need} = ${eq.time_to_impact} min</div>` : ""}
+    ${f.egress_blocked ? `<div class="sec">HAZARD NETWORK</div>
+      <div>Egress <b>confirmed impassable</b> by prior independent reports.
+      +${25} min detour applied to evac need. This person did not report it —
+      earlier tickets did.</div>` : ""}
     <div class="sec">COUNTERFACTUAL</div>
     <div>tone score ${c.panic_score ?? "—"}/100 · a tone-ranked queue serves this <b>#${c.tone_rank ?? "—"}</b>;
       BEACON serves it <b>#${c.need_rank ?? "—"}</b></div>

@@ -102,6 +102,40 @@ Screen-record it once (`Cmd+Shift+5`) for the backup video and submission
 clip — see [VIDEO-PROMPTS.md](VIDEO-PROMPTS.md) for recording steps and
 optional AI b-roll prompts.
 
+## The hazard network — the queue learns from itself
+
+Every ticket that names a blocked route makes the **next** ticket smarter. This
+is evidence accumulation, not learned policy: a road being impassable is a fact
+reported from the field, so BEACON only counts and ages those reports.
+
+**Corroboration ladder** — a single stranger's report is never ground truth:
+
+| reports | status | effect |
+|---|---|---|
+| 1 | `REPORTED` (amber ring) | advisory only — sender warned, no routing effect |
+| 2+ independent | `CONFIRMED` (red ✕) | treated as impassable |
+| all older than 45 min | `STALE` | aged out, advisory only |
+
+Witnesses are counted by **distinct case**, so one panicking person filing five
+tickets is one witness — not a self-confirmed hazard.
+
+The headline case isn't the person who says "I'm trapped" (they already route to
+rescue). It's the person who thinks they can drive out:
+
+```
+Ticket 2  "I have my car, leaving from Miner's Bend"   standard          18 − 10 = +8
+          ...two independent witnesses report the road...
+Ticket 4  "I have my car, leaving from Miner's Bend"   transport_assist  18 − 35 = −17
+```
+
+Same message, different outcome — because strangers told the queue that road was
+on fire. BEACON knows something they don't.
+
+Confirmed hazards reach dispatch through exactly one named, auditable constant
+(`BLOCKED_EGRESS_PENALTY = 25`) applied to evac need — **never by rewriting a
+rule**, and the receipt says so explicitly. The intake form warns the sender, and
+the map paints each street clear / reported / impassable.
+
 ## The calibration ledger — what learns, and what never does
 
 BEACON has a feedback loop, but the boundary is the point:

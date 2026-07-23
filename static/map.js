@@ -31,12 +31,14 @@ const PIN_COLOR = {
 };
 const FLAGGED = new Set(["fire_rescue", "transport_assist", "accessible_shelter", "needs_human_review"]);
 
+const slug = (s) => s.replace(/[^a-z0-9]+/g, "-");
+
 function buildMap() {
   const streetDots = Object.entries(STREETS).map(([name, c]) => {
     const x = pctX(c.x), y = pctY(c.y);
     const label = name.replace(/\b\w/g, (m) => m.toUpperCase());
-    return `<circle cx="${x}" cy="${y}" r="2" fill="#8A7B63"/>
-      <text x="${x + 6}" y="${y + 3}" fill="#70634E" font-size="9.5"
+    return `<circle id="st-${slug(name)}" cx="${x}" cy="${y}" r="2" fill="#8A7B63"/>
+      <text id="stl-${slug(name)}" x="${x + 6}" y="${y + 3}" fill="#70634E" font-size="9.5"
         font-family="'IBM Plex Mono',monospace">${label}</text>`;
   }).join("");
 
@@ -87,15 +89,20 @@ function buildMap() {
 
     <!-- streets -->
     ${streetDots}
+    <g id="hazards"></g>
     <g id="pins"></g>
 
     <!-- legend -->
     <g font-family="'IBM Plex Mono',monospace" font-size="9.5">
-      <rect x="12" y="12" width="158" height="92" fill="#14100C" fill-opacity=".85" stroke="#3B3122"/>
+      <rect x="12" y="12" width="176" height="134" fill="#14100C" fill-opacity=".85" stroke="#3B3122"/>
       <circle cx="26" cy="32" r="5" fill="#FF5C2E"/><text x="38" y="36" fill="#C9BCA5">FIRE / RESCUE</text>
       <circle cx="26" cy="52" r="5" fill="#FFB020"/><text x="38" y="56" fill="#C9BCA5">TRANSPORT</text>
       <circle cx="26" cy="72" r="5" fill="#7DB2E8"/><text x="38" y="76" fill="#C9BCA5">SHELTER</text>
       <circle cx="26" cy="91" r="3.5" fill="#70634E"/><text x="38" y="95" fill="#C9BCA5">STANDARD</text>
+      <text x="14" y="118" fill="#FF5C2E" font-size="11">&#10005;</text>
+      <text x="38" y="118" fill="#C9BCA5">ROAD IMPASSABLE</text>
+      <circle cx="26" cy="132" r="5" fill="none" stroke="#FFB020" stroke-dasharray="2 2"/>
+      <text x="38" y="136" fill="#C9BCA5">HAZARD REPORTED</text>
     </g>
   </svg>`;
 }
@@ -116,6 +123,45 @@ function renderPins(cases) {
       fill="${color}" stroke="#14100C" stroke-width="1.5" style="cursor:pointer"
       onmouseover="highlightCard('${c.id}', true)" onmouseout="highlightCard('${c.id}', false)"
       onclick="openReceipt('${c.id}')"><title>${(c.requester_name || "").replace(/[<>&"]/g, "")}</title></circle>`;
+  }).join("");
+}
+
+function renderHazards(list) {
+  const g = document.getElementById("hazards");
+  if (!g) return;
+  // Reset every street to its clear styling first.
+  Object.keys(STREETS).forEach((n) => {
+    const dot = document.getElementById("st-" + slug(n));
+    const lab = document.getElementById("stl-" + slug(n));
+    if (dot) { dot.setAttribute("fill", "#8A7B63"); dot.setAttribute("r", "2"); }
+    if (lab) { lab.setAttribute("fill", "#70634E"); }
+  });
+
+  g.innerHTML = (list || []).map((h) => {
+    const c = STREETS[h.street];
+    if (!c) return "";
+    const x = pctX(c.x), y = pctY(c.y);
+    const dot = document.getElementById("st-" + slug(h.street));
+    const lab = document.getElementById("stl-" + slug(h.street));
+
+    if (h.impassable) {
+      if (dot) { dot.setAttribute("fill", "#FF5C2E"); dot.setAttribute("r", "3"); }
+      if (lab) { lab.setAttribute("fill", "#FF8C5A"); }
+      return `<g style="cursor:help"><title>${h.street} — ${h.label} · confirmed by ${h.fresh} reports</title>
+        <line x1="${x - 6}" y1="${y - 6}" x2="${x + 6}" y2="${y + 6}" stroke="#FF5C2E" stroke-width="2.5"/>
+        <line x1="${x + 6}" y1="${y - 6}" x2="${x - 6}" y2="${y + 6}" stroke="#FF5C2E" stroke-width="2.5"/>
+        <circle cx="${x}" cy="${y}" r="13" fill="none" stroke="#FF5C2E" stroke-width="1" opacity=".5">
+          <animate attributeName="r" values="9;17" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values=".55;0" dur="2s" repeatCount="indefinite"/>
+        </circle></g>`;
+    }
+    if (h.status === "reported") {
+      if (lab) { lab.setAttribute("fill", "#FFB020"); }
+      return `<g style="cursor:help"><title>${h.street} — ${h.label} · ${h.fresh} report, unconfirmed</title>
+        <circle cx="${x}" cy="${y}" r="7" fill="none" stroke="#FFB020"
+          stroke-width="1.5" stroke-dasharray="3 2"/></g>`;
+    }
+    return "";
   }).join("");
 }
 

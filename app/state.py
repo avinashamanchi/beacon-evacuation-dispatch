@@ -90,6 +90,34 @@ def counts() -> dict:
         return result
 
 
+# --- Hazard network ---------------------------------------------------------
+# Field-reported road conditions, shared across every subsequent ticket.
+# Incident-scoped: cleared by reset_all() (unlike calibration, which persists).
+_hazards: dict[str, dict] = {}
+
+
+def add_hazard_report(street: str, kind: str, case_id: str, note: str = ""):
+    with _lock:
+        h = _hazards.setdefault(street, {"street": street, "reports": []})
+        h["reports"].append({
+            "at": now_iso(), "kind": kind, "case_id": case_id, "note": note,
+        })
+        return dict(h)
+
+
+def all_hazards() -> list[dict]:
+    with _lock:
+        return [
+            {"street": h["street"], "reports": [dict(r) for r in h["reports"]]}
+            for h in _hazards.values()
+        ]
+
+
+def clear_hazards():
+    with _lock:
+        _hazards.clear()
+
+
 # --- Learning substrate -----------------------------------------------------
 # Observations and approved calibration deliberately SURVIVE reset_all(): a new
 # incident does not erase what previous incidents taught us.
@@ -144,6 +172,7 @@ def reset_all():
     with _lock:
         _cases.clear()
         _escalations.clear()
+        _hazards.clear()
         _fire["eta_minutes"] = FIRE_ETA_MINUTES
         _fire["perimeter_step"] = 0
 

@@ -25,7 +25,10 @@ class ExtractedFacts(BaseModel):
     people_count: int = 1
     location_text: str = ""
     injuries_reported: bool = False
+    road_blocked: bool = False   # message reports a route as impassable
     confidence: float = 0.0
+    # Derived by the hazard network, NOT by the model — set after extraction.
+    egress_blocked: bool = False
 
 
 SYSTEM_PROMPT = """You extract facts from messages sent to a wildfire evacuation support line.
@@ -116,6 +119,7 @@ def _safety_net(message: str):
             has_vehicle=False,
             location_text=extract_location(message),
             people_count=_count_people(m),
+            road_blocked=any(k in m for k in ["blocked", "road", "bloquea", "salida"]),
             confidence=0.0,
         )
         return facts, True
@@ -138,16 +142,24 @@ def _demo_extract(message: str):
     loc = extract_location(message)
     people = _count_people(m)
 
+    road_blocked = any(k in m for k in [
+        "road is blocked", "road out", "blocked by flames", "road blocked",
+        "street is blocked", "can't get through", "cant get through", "impassable",
+        "road closed by fire", "bloquea", "salida",
+    ])
+
     # 1. Rescue: physically trapped / injured (English + Spanish stems).
     if any(k in m for k in ["trapped", "blocked", "surrounded", "atrapad", "rodead", "bloquea"]) or "blocked by flames" in m:
         return ExtractedFacts(
             physically_trapped=True, can_self_evacuate=False, has_vehicle=False,
-            location_text=loc, people_count=people, confidence=1.0,
+            location_text=loc, people_count=people, road_blocked=road_blocked or True,
+            confidence=1.0,
         )
     if any(k in m for k in ["injured", "hurt", "bleeding", "burned", "herid"]):
         return ExtractedFacts(
             injuries_reported=True, can_self_evacuate=False,
-            location_text=loc, people_count=people, confidence=1.0,
+            location_text=loc, people_count=people,
+            road_blocked=road_blocked, confidence=1.0,
         )
 
     # 2. Mobility / medical need -> transport or accessible shelter.
@@ -194,17 +206,20 @@ def _demo_extract(message: str):
             already_evacuated=already_evac,
             location_text=loc,
             people_count=people,
+            road_blocked=road_blocked,
             confidence=1.0,
         )
 
     if is_info:
         return ExtractedFacts(
             is_informational_only=True, mobility="ambulatory",
-            already_evacuated=already_evac, location_text=loc, confidence=1.0,
+            already_evacuated=already_evac, location_text=loc,
+            road_blocked=road_blocked, confidence=1.0,
         )
 
     # Default: routine, can self-evacuate in time.
     return ExtractedFacts(
         mobility="ambulatory", has_vehicle=has_vehicle, can_self_evacuate=True,
-        already_evacuated=already_evac, location_text=loc, confidence=1.0,
+        already_evacuated=already_evac, location_text=loc,
+        road_blocked=road_blocked, confidence=1.0,
     )

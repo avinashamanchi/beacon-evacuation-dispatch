@@ -23,7 +23,7 @@ from app import config, state
 from app.analytics import attach_ranks, compute_metrics, panic_score
 from app.extraction import extract_facts
 from app.guide_answer import compose_answer
-from app import learning
+from app import hazards, learning
 from app.router_rules import route
 from app.seeds import DEMO_TICKETS, NOISE_TICKETS, find_street, pin_for
 from app.security import (
@@ -178,6 +178,24 @@ def process_message(name: str, message: str, existing_ticket_id=None) -> dict:
         force_review = True
         state.update_case(case_id, facts=facts.model_dump())
 
+    # 2b. Hazard network — this ticket both teaches and learns.
+    #     Contribute: if it names a blocked route, record it for everyone after.
+    reported_street = hazards.report_from_case(case_id, facts)
+    if reported_street:
+        st = hazards.status(reported_street)
+        state.add_timeline(case_id, f"Hazard reported: {reported_street} "
+                                    f"({st['label']}) — now {st['status']} "
+                                    f"with {st['fresh']} witness(es)")
+    #     Consume: is this person's own egress already known-impassable?
+    blocked = hazards.egress_blocked_for(facts.location_text)
+    if blocked and not facts.physically_trapped:
+        facts.egress_blocked = True
+        state.update_case(case_id, facts=facts.model_dump())
+        state.add_timeline(
+            case_id,
+            f"Egress compromised: {blocked['street']} confirmed {blocked['label']} "
+            f"by {blocked['fresh']} prior report(s) — detour penalty applied")
+
     # 3. Deterministic routing.
     path, rule, eq = route(facts, state.get_fire()["eta_minutes"])
     if force_review:
@@ -292,7 +310,10 @@ def film():
 
 @app.post("/api/submit")
 def submit(body: SubmitBody):
-    return process_message(body.name, body.message)
+    case = process_message(body.name, body.message)
+    # Tell the sender what other people have reported about their street.
+    facts = case.get("facts") or {}
+    return {**case, "hazard_advisory": hazards.advisory_for(facts.get("location_text", ""))}
 
 
 @app.get("/api/state")
@@ -306,6 +327,7 @@ def api_state():
         "crew": config.CREW_COUNTS,
         "metrics": compute_metrics(cases, config.CREW_COUNTS),
         "escalations": state.recent_escalations(),
+        "hazards": hazards.all_status(),
         "sim_running": state.sim_running(),
         "mode": {"demo": config.DEMO_MODE, "mock_zendesk": config.USE_MOCK_ZENDESK,
                  "fallback_extraction": config.USE_FALLBACK_EXTRACTION},

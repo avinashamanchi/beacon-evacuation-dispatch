@@ -7,12 +7,17 @@ whose condition holds fires. The model never touches this function.
 
 EVAC_MINUTES = {"ambulatory": 10, "limited": 30, "non_ambulatory": 45, "unknown": 30}
 NO_VEHICLE_PENALTY = 15
+# Their street is confirmed impassable by 2+ independent field reports, so the
+# egress they are counting on costs a detour. Set by the hazard network.
+BLOCKED_EGRESS_PENALTY = 25
 
 
 def evac_time_needed(facts) -> int:
     t = EVAC_MINUTES[facts.mobility]
     if not facts.has_vehicle:
         t += NO_VEHICLE_PENALTY
+    if getattr(facts, "egress_blocked", False):
+        t += BLOCKED_EGRESS_PENALTY
     return t
 
 

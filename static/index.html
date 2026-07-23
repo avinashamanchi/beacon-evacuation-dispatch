@@ -58,6 +58,12 @@
   }
   .chip.rescue{ background:#F7D8CC; color:#A33B12; }
   .chip.transport{ background:#F7EAC7; color:#8A6A0E; }
+  .hazard{
+    margin-top:10px; background:#FBEDE7; border:1px solid #E4A88F;
+    border-left:3px solid #C2410C; border-radius:4px; padding:9px 11px;
+    font-size:12.5px; color:#7A2E0E; line-height:1.45;
+  }
+  .hazard b{ display:block; margin-bottom:2px; }
   .chip.shelter{ background:#D9E7F5; color:#2B5D8F; }
   .fine{ text-align:center; font-size:11px; color:#A39A88; margin-top:14px; }
 </style>
@@ -102,11 +108,19 @@
     function renderOutcome(c) {
       const box = document.getElementById('result');
       const caseLine = `<div style="margin-top:8px"><a href="/dashboard">case #${esc(c.id)} · dispatch dashboard</a></div>`;
+      // Live hazard advisory built from what OTHER people have reported.
+      const hz = c.hazard_advisory;
+      const hazardLine = hz ? `<div class="hazard">
+          <b>⚠ ${esc(hz.street.replace(/\b\w/g, m => m.toUpperCase()))} — ${esc(hz.label)}</b>
+          <div>${hz.impassable
+            ? `Confirmed impassable by ${hz.fresh} separate reports. Do not attempt this route.`
+            : `Reported by ${hz.fresh} person so far — unconfirmed. Treat with caution.`}</div>
+        </div>` : '';
       if (c.dispatch_path === 'auto_answered' && c.auto_answer) {
         box.className = 'ok show';
         box.innerHTML = `<b>Answered instantly</b>
           <div class="reply"><div class="from">Meridian Mutual · automated reply</div>${esc(c.auto_answer)}</div>
-          ${caseLine}`;
+          ${hazardLine}${caseLine}`;
       } else if (TEAM_LABEL[c.dispatch_path]) {
         const [label, cls] = TEAM_LABEL[c.dispatch_path];
         const loc = c.facts && c.facts.location_text ? ' to ' + esc(c.facts.location_text) : '';
@@ -114,12 +128,12 @@
         box.innerHTML = `<b>Help is being dispatched${loc}</b>
           <div>Your message was routed on what you need — not how it sounds.</div>
           <span class="chip ${cls}">${esc(label)} · crew paged</span>
-          ${caseLine}`;
+          ${hazardLine}${caseLine}`;
       } else {
         box.className = 'ok show';
         box.innerHTML = `<b>Message received — case #${esc(c.id)}</b>
           <div>A specialist is reviewing your message.</div>
-          ${caseLine}`;
+          ${hazardLine}${caseLine}`;
       }
     }
 
