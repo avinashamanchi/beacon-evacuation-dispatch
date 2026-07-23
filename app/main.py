@@ -485,10 +485,15 @@ async def upload_photo(file: UploadFile = File(...), name: str = Form("Anonymous
     data = await file.read(vision.MAX_PHOTO_BYTES + 1)
     if len(data) > vision.MAX_PHOTO_BYTES:
         return JSONResponse(status_code=413, content={"error": "photo too large (max 8MB)"})
-    kind = vision.sniff_type(data)
-    if not kind:
+    if not vision.sniff_type(data):
         return JSONResponse(status_code=415,
                             content={"error": "only JPEG or PNG photos are accepted"})
+    return ingest_photo(data, name, message)
+
+
+def ingest_photo(data: bytes, name: str, message: str = "") -> dict:
+    """Shared photo pipeline — used by live uploads and the bundled demo pack."""
+    kind = vision.sniff_type(data) or "jpeg"
 
     loc = vision.locate(data)
     pfacts = vision.analyze(data)
@@ -509,7 +514,7 @@ async def upload_photo(file: UploadFile = File(...), name: str = Form("Anonymous
     if pfacts.heavy_smoke:
         parts.append("Heavy smoke.")
     if street:
-        parts.append(f"Location {street.title()}.")
+        parts.append(f"Location {evac_plan.street_label(street)}.")
     synthesized = " ".join(parts) or "Photo submitted from the evacuation area."
 
     # File the hazard BEFORE routing, so the sender's own photo evidence reaches
@@ -554,6 +559,37 @@ async def upload_photo(file: UploadFile = File(...), name: str = Form("Anonymous
 def _facts_obj(case: dict):
     from app.extraction import ExtractedFacts
     return ExtractedFacts(**(case.get("facts") or {}))
+
+
+DEMO_DIR = os.path.join(STATIC_DIR, "demo")
+DEMO_PHOTOS = {
+    1: ("mb-1.jpg", "Marcus Delacroix", ""),
+    2: ("mb-2.jpg", "Priya Nandakumar", ""),
+    3: ("mb-3.jpg", "Tess McGrail", ""),
+    4: ("gp-1.jpg", "Ozzie Lindqvist", ""),
+}
+
+
+@app.post("/api/seed/photo/{n}")
+def seed_photo(n: int):
+    """Fire a bundled, geotagged demo photo through the real photo pipeline.
+
+    Stage-safe: a photo taken at the venue carries real GPS and correctly
+    resolves as off-map, so the demo pack is anchored inside Cedar Canyon.
+    """
+    if n not in DEMO_PHOTOS:
+        return JSONResponse(status_code=404,
+                            content={"error": "unknown demo photo",
+                                     "valid": sorted(DEMO_PHOTOS)})
+    fname, who, msg = DEMO_PHOTOS[n]
+    try:
+        with open(os.path.join(DEMO_DIR, fname), "rb") as fh:
+            data = fh.read()
+    except OSError as exc:
+        return JSONResponse(status_code=500,
+                            content={"error": f"demo photo missing ({exc!r}) — "
+                                              "run: python -m tools.make_demo_photos"})
+    return ingest_photo(data, who, msg)
 
 
 @app.get("/api/plan/{case_id}")

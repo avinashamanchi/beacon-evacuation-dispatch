@@ -415,6 +415,13 @@ function toggleHelp() { document.getElementById("help").classList.toggle("hidden
 
 // ---------- controls + shortcuts ----------
 async function seedDemo(n) { await fetch("/api/seed/demo/" + n, { method: "POST" }); poll(); }
+let photoSeq = 0;
+async function seedPhoto(n) {
+  // No argument = walk the pack in order, so repeated presses tell the story.
+  const idx = n || ((photoSeq++ % 4) + 1);
+  await fetch("/api/seed/photo/" + idx, { method: "POST" });
+  poll(); pollFilms();
+}
 async function advanceFire() { await fetch("/api/fire/advance", { method: "POST" }); poll(); }
 async function startReplay() { await fetch("/api/simulate", { method: "POST" }); poll(); }
 async function resetIncident() { await fetch("/api/reset", { method: "POST" }); LAST = null; poll(); }
@@ -429,6 +436,7 @@ document.addEventListener("keydown", (e) => {
   if (!document.getElementById("modal").classList.contains("hidden")) return;
   const k = e.key.toLowerCase();
   if (["1", "2", "3", "4"].includes(k)) seedDemo(+k);
+  else if (k === "5") seedPhoto();
   else if (k === "f") advanceFire();
   else if (k === "r") startReplay();
   else if (k === "m") toggleSound();

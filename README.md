@@ -164,6 +164,14 @@ filed *before* routing, so the sender's own evidence reaches the deterministic
 pipeline. A photo of flames with GPS, and nothing typed at all, routes to
 `transport_assist` at `18 − 35 = −17`.
 
+**Bundled demo pack** — press `5` (or click **Photo**) to fire a geotagged demo
+photo through the real pipeline; repeated presses walk the pack and build the
+story. Stage-safe by design: a photo taken *at the venue* carries real GPS and
+correctly resolves `off-map`, so the pack is anchored inside Cedar Canyon.
+Regenerate with `python -m tools.make_demo_photos`; `pytest` asserts each frame
+still carries GPS and still reads as fire, so the pack can't silently drift away
+from the detector.
+
 **Timelines** stitch every photo of a street chronologically — `19:50 flames →
 19:56 flames → 20:02 smoke` — so dispatch sees fire progression, not one frame.
 

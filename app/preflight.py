@@ -48,6 +48,30 @@ def run_checks() -> dict:
               f"id={config.ZENDESK_DISPATCH_FIELD_ID}" if config.ZENDESK_DISPATCH_FIELD_ID
               else "not set — custom field write-back will be skipped")
 
+    # Photo intake stack
+    try:
+        import PIL  # noqa: F401
+        check("photo_imaging", True, "Pillow available (EXIF + offline analysis)")
+    except ImportError:
+        check("photo_imaging", False, "Pillow missing — pip install -r requirements.txt")
+
+    import os as _os
+    _static = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "static")
+    _demo = _os.path.join(_static, "demo")
+    _pack = sorted(f for f in _os.listdir(_demo)) if _os.path.isdir(_demo) else []
+    check("demo_photo_pack", len(_pack) >= 4,
+          f"{len(_pack)} bundled photos" if _pack
+          else "missing — run: python -m tools.make_demo_photos")
+
+    _uploads = _os.path.join(_static, "uploads")
+    try:
+        _os.makedirs(_uploads, exist_ok=True)
+        _probe = _os.path.join(_uploads, ".probe")
+        open(_probe, "w").close(); _os.remove(_probe)
+        check("uploads_writable", True, _uploads)
+    except OSError as exc:
+        check("uploads_writable", False, f"cannot write uploads dir: {exc!r}")
+
     check("fire_eta", config.FIRE_ETA_MINUTES > 0,
           f"{config.FIRE_ETA_MINUTES} minutes at incident start")
     check("crew_counts", isinstance(config.CREW_COUNTS, dict) and config.CREW_COUNTS,
