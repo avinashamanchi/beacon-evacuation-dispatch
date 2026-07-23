@@ -90,6 +90,52 @@ def counts() -> dict:
         return result
 
 
+# --- Learning substrate -----------------------------------------------------
+# Observations and approved calibration deliberately SURVIVE reset_all(): a new
+# incident does not erase what previous incidents taught us.
+_observations: list[dict] = []
+_calibration = {"overrides": {}, "audit": []}
+
+
+def record_observation(obs: dict):
+    with _lock:
+        obs = dict(obs)
+        obs["at"] = now_iso()
+        _observations.append(obs)
+        return obs
+
+
+def all_observations() -> list[dict]:
+    with _lock:
+        return [dict(o) for o in _observations]
+
+
+def get_calibration() -> dict:
+    with _lock:
+        return {"overrides": dict(_calibration["overrides"]),
+                "audit": [dict(a) for a in _calibration["audit"]]}
+
+
+def apply_calibration(key: str, value: int, evidence: dict, approved_by: str):
+    """Human-approved constant change. Recorded with its evidence — a signed
+    proposal, never a silent update."""
+    with _lock:
+        before = _calibration["overrides"].get(key)
+        _calibration["overrides"][key] = value
+        _calibration["audit"].insert(0, {
+            "at": now_iso(), "key": key, "from": before, "to": value,
+            "approved_by": approved_by, "evidence": evidence,
+        })
+        return dict(_calibration["overrides"])
+
+
+def reset_learning():
+    with _lock:
+        _observations.clear()
+        _calibration["overrides"].clear()
+        _calibration["audit"].clear()
+
+
 _sim = {"running": False}
 
 

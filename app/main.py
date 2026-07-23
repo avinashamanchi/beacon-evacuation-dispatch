@@ -23,6 +23,7 @@ from app import config, state
 from app.analytics import attach_ranks, compute_metrics, panic_score
 from app.extraction import extract_facts
 from app.guide_answer import compose_answer
+from app import learning
 from app.router_rules import route
 from app.seeds import DEMO_TICKETS, NOISE_TICKETS, find_street, pin_for
 from app.security import (
@@ -38,6 +39,7 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 async def lifespan(_app):
     for w in config.startup_warnings():
         print(w)
+    learning.sync_router()  # re-apply human-approved calibration on boot
     tasks = [asyncio.create_task(_fire_ticker())]
     if not config.USE_MOCK_ZENDESK:
         tasks.append(asyncio.create_task(_zendesk_poller()))
@@ -399,6 +401,8 @@ def case_action(case_id: str, body: CaseAction):
                                      + (f" ({reason})" if reason else ""))
         state.add_timeline(case_id, f"Dispatcher override: {old} -> {body.path}"
                            + (f" — {reason}" if reason else ""))
+        # Every override is a labeled disagreement between the router and a human.
+        learning.record_override(case_id, old, body.path, reason)
         tid = c["zendesk_ticket_id"]
         if tid is not None:
             try:
@@ -414,6 +418,64 @@ def case_action(case_id: str, body: CaseAction):
             _escalate(case_id, body.path, ExtractedFacts(**facts_dict))
 
     return state.get_case(case_id)
+
+
+class Observation(BaseModel):
+    """Ground truth reported back from the field."""
+    actual_evac_minutes: Optional[int] = Field(default=None, ge=0, le=600)
+    note: str = Field(default="", max_length=300)
+    # {"medical_equipment": "oxygen"} — fields the extractor got wrong
+    fact_corrections: dict[str, str] = Field(default_factory=dict)
+
+
+@app.post("/api/case/{case_id}/observe")
+def observe(case_id: str, body: Observation):
+    """Close the loop: report what ACTUALLY happened. This is the only source
+    of truth the calibration engine is allowed to learn from."""
+    c = state.get_case(case_id)
+    if not c:
+        return JSONResponse(status_code=404, content={"error": "unknown_case"})
+    facts = c.get("facts") or {}
+    mobility = facts.get("mobility")
+
+    if body.actual_evac_minutes is not None:
+        learning.record_outcome(case_id, mobility, body.actual_evac_minutes,
+                                sanitize_text(body.note)[:300])
+        state.add_timeline(case_id, f"Outcome reported: evacuation took "
+                                    f"{body.actual_evac_minutes} min (mobility={mobility})")
+    for field, should_be in list(body.fact_corrections.items())[:11]:
+        learning.record_fact_correction(case_id, sanitize_text(field)[:40],
+                                        facts.get(field), sanitize_text(should_be)[:60])
+        state.add_timeline(case_id, f"Fact corrected: {field} "
+                                    f"{facts.get(field)!r} -> {should_be!r}")
+    return {"recorded": True, "case": state.get_case(case_id)}
+
+
+@app.get("/api/learning")
+def learning_report():
+    """Scorecard, calibration proposals, and rule reviews awaiting a human."""
+    return learning.report()
+
+
+class Approval(BaseModel):
+    proposal_id: str = Field(max_length=80)
+    approved_by: str = Field(default="dispatcher", max_length=60)
+
+
+@app.post("/api/learning/approve")
+def learning_approve(body: Approval):
+    """A human signs a calibration proposal. Only then does a constant change."""
+    applied = learning.approve(sanitize_text(body.proposal_id)[:80],
+                               sanitize_text(body.approved_by)[:60] or "dispatcher")
+    if not applied:
+        return JSONResponse(status_code=404,
+                            content={"error": "no such active proposal"})
+    return {"applied": applied, "live_constants": dict(router_rules_constants())}
+
+
+def router_rules_constants():
+    from app import router_rules
+    return router_rules.EVAC_MINUTES
 
 
 def _zendesk_note(case: dict, note: str):

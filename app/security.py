@@ -110,7 +110,9 @@ def categorize(path: str, method: str):
         return "submit"
     if path.startswith("/api/seed") or path in ("/api/fire/advance", "/api/simulate", "/api/reset"):
         return "mutate"
-    if path.startswith("/api/case/") and method == "PATCH":
+    if path.startswith("/api/case/") and method in ("PATCH", "POST"):
+        return "mutate"
+    if path == "/api/learning/approve":
         return "mutate"
     if path.startswith("/api/"):
         return "read"

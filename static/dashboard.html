@@ -172,6 +172,30 @@
   }
   .receipt .actions button:hover{ border-color:#221B12; }
 
+  /* calibration ledger */
+  .cal{ padding:8px 12px 12px; font-size:12px; }
+  .cal .top{ display:flex; gap:18px; align-items:baseline; margin-bottom:8px; }
+  .cal .stat .v{ font-family:'IBM Plex Mono',monospace; font-size:19px; font-weight:600; }
+  .cal .stat .k{ font-size:9px; color:var(--faint); letter-spacing:.18em; text-transform:uppercase; }
+  .cal .consts{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--dun); margin-bottom:8px; }
+  .cal .consts b{ color:var(--moss); }
+  .prop{ border:1px solid var(--line-soft); border-left:3px solid var(--moss);
+    background:var(--panel2); padding:8px 10px; margin-top:7px; }
+  .prop .t{ font-weight:600; font-size:12px; }
+  .prop .num{ font-family:'IBM Plex Mono',monospace; font-size:14px; margin:3px 0; }
+  .prop .num s{ color:var(--faint); } .prop .num b{ color:var(--moss); }
+  .prop .why{ font-size:11px; color:var(--dun); line-height:1.45; }
+  .prop .ev{ font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--faint); margin-top:3px; }
+  .prop button{ font-family:'Barlow Condensed',sans-serif; text-transform:uppercase;
+    letter-spacing:.1em; font-size:11px; font-weight:600; background:var(--moss);
+    color:#14100C; border:none; padding:5px 12px; margin-top:6px; cursor:pointer; border-radius:2px; }
+  .prop button:hover{ filter:brightness(1.12); }
+  .prop button:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+  .rrev{ border:1px solid var(--line-soft); border-left:3px solid var(--amber);
+    background:var(--panel2); padding:8px 10px; margin-top:7px; }
+  .rrev .t{ font-weight:600; font-size:12px; color:var(--amber); }
+  .rrev .lock{ font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--faint); margin-top:3px; }
+
   .empty{ padding:14px 6px 10px; font-size:11px; color:var(--faint);
     font-family:'IBM Plex Mono',monospace; text-align:center; }
 
@@ -291,6 +315,14 @@
         </div>
         <div class="scatter-wrap"><svg id="scatter" viewBox="0 0 560 190" role="img"
           aria-label="Scatter of message tone versus computed need"></svg></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">
+          <span class="t disp">Calibration ledger</span>
+          <span class="s">the constants learn · the rules never do</span>
+        </div>
+        <div class="cal" id="cal"></div>
       </div>
 
       <div class="panel">

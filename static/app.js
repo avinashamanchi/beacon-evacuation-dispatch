@@ -261,6 +261,59 @@ document.getElementById("modal").addEventListener("click", (e) => {
   if (e.target.id === "modal") closeModal();
 });
 
+// ---------- calibration ledger ----------
+function renderLearning(d) {
+  const s = d.scorecard || {};
+  const acc = s.extraction_accuracy == null ? "—" : Math.round(s.extraction_accuracy * 100) + "%";
+  const approved = (d.calibration && d.calibration.overrides) || {};
+  const consts = Object.entries(d.live_constants || {}).map(([k, v]) => {
+    const cal = approved["evac_minutes." + k] != null;
+    return `${esc(k)} ${cal ? `<b>${v}★</b>` : v}`;
+  }).join(" · ");
+
+  const props = (d.proposals || []).map((p) => `<div class="prop">
+      <div class="t">${esc(p.title)}</div>
+      <div class="num"><s>${p.current} min</s> → <b>${p.proposed} min</b>
+        <span style="color:var(--faint)">(${p.drift_pct}% off, n=${p.samples})</span></div>
+      <div class="why">${esc(p.rationale)}</div>
+      <div class="ev">observed: ${p.observed_values.join(", ")}</div>
+      <button onclick="approveProposal('${esc(p.id)}')">Approve calibration</button>
+    </div>`).join("");
+
+  const revs = (d.rule_reviews || []).map((r) => `<div class="rrev">
+      <div class="t">${esc(r.title)}</div>
+      <div class="why">Suspect rule <b>${esc(r.suspect_rule)}</b>${
+        r.sample_reasons.length ? " — " + esc(r.sample_reasons.join("; ")) : ""}</div>
+      <div class="lock">🔒 ${esc(r.action)}</div>
+    </div>`).join("");
+
+  document.getElementById("cal").innerHTML = `
+    <div class="top">
+      <div class="stat"><div class="k">Extraction</div><div class="v">${acc}</div></div>
+      <div class="stat"><div class="k">Reviewed</div><div class="v">${s.cases_reviewed || 0}</div></div>
+      <div class="stat"><div class="k">Overrides</div><div class="v">${s.override_count || 0}</div></div>
+      <div class="stat"><div class="k">Signals</div><div class="v">${s.observations || 0}</div></div>
+    </div>
+    <div class="consts">evac est · ${consts}</div>
+    ${props}${revs}
+    ${!props && !revs ? `<div class="empty">no proposals — report outcomes to calibrate</div>` : ""}`;
+}
+
+async function pollLearning() {
+  try {
+    const r = await fetch("/api/learning");
+    if (r.ok) renderLearning(await r.json());
+  } catch (e) { /* keep last */ }
+}
+
+async function approveProposal(id) {
+  await fetch("/api/learning/approve", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ proposal_id: id, approved_by: "dispatcher" }),
+  });
+  pollLearning(); poll();
+}
+
 // ---------- dispatch ping (Web Audio, no assets) ----------
 let audioCtx = null;
 let soundOn = localStorage.getItem("beacon-sound") === "on";
@@ -367,5 +420,7 @@ async function poll() {
 }
 setInterval(tickClock, 1000);
 setInterval(poll, 2000);
+setInterval(pollLearning, 6000);
 tickClock();
 poll();
+pollLearning();

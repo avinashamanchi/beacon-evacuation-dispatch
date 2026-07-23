@@ -102,6 +102,47 @@ Screen-record it once (`Cmd+Shift+5`) for the backup video and submission
 clip — see [VIDEO-PROMPTS.md](VIDEO-PROMPTS.md) for recording steps and
 optional AI b-roll prompts.
 
+## The calibration ledger — what learns, and what never does
+
+BEACON has a feedback loop, but the boundary is the point:
+
+| | |
+|---|---|
+| **Learns** | the *constants inside* the rules (how long an evacuation actually takes) and how accurately the model extracts facts |
+| **Never learns** | the rules, their order, or the routing decision |
+
+`EVAC_MINUTES["non_ambulatory"] = 45` is the most load-bearing number in the
+system, and it started life as a guess. Report real outcomes
+(`POST /api/case/{id}/observe`) and the engine compares reality to the estimate.
+At **n ≥ 3** and **>15% drift** it raises a *proposal* — never an auto-update:
+
+```
+Evacuation estimate for 'non_ambulatory'
+45 min → 64 min   (42% off, n=3)
+observed: 62, 64, 70            [ Approve calibration ]
+```
+
+Approving is the only path by which learning reaches the routing math, and it
+rewrites exactly one named integer, into an audit trail with the evidence and
+the approver. Old receipts keep the number that actually drove their decision —
+**calibration never rewrites history**; only new dispatches use the new value.
+
+When dispatchers keep overriding the same way, that's evidence a *rule* is
+wrong. BEACON surfaces it — `3 overrides moved accessible_shelter →
+transport_assist · suspect rule R3` — and then **stops**, with a lock icon and
+no approve button. Changing a rule is a code change with a code review, not
+something the system does to itself at 3 a.m.
+
+**Why it's built this way:** a model trained on historical dispatch outcomes
+would learn that panicked callers get served first, because that is what the
+historical system did. Learning from biased history reproduces the bias — the
+exact failure this project exists to argue against. So the router stays frozen
+and deterministic, and only measured reality is allowed to move a number.
+
+Median (not mean) is used so a single catastrophic outlier can't yank an
+estimate. Endpoints: `GET /api/learning`, `POST /api/case/{id}/observe`,
+`POST /api/learning/approve`.
+
 ## 5-step demo checklist
 
 1. Open the dashboard, press **R** (Replay incident) — the noise feed streams
