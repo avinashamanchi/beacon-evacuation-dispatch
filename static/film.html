@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BEACON — The Film</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='82' font-size='82'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0C0A07; --bone:#EFE6D8; --dun:#9C8E77; --faint:#70634E;
+    --ember:#FF5C2E; --amber:#FFB020; --sky:#7DB2E8;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; background:#000; overflow:hidden; }
+  body{ font-family:'Barlow',sans-serif; color:var(--bone); }
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+  .disp{ font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; }
+
+  /* stage + letterbox */
+  #frame{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:#000; }
+  #screen{ position:relative; width:100vw; height:calc(100vw*9/16); max-height:100vh; max-width:calc(100vh*16/9); background:var(--ink); overflow:hidden; }
+  #progress{ position:absolute; top:0; left:0; height:2px; background:var(--ember); width:0%; z-index:40; transition:width .2s linear; }
+
+  /* scenes */
+  .scene{ position:absolute; inset:0; opacity:0; pointer-events:none; transition:opacity 1.1s ease; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:6vh 8vw; }
+  .scene.on{ opacity:1; }
+
+  /* S1 evidence */
+  .ev-line{ font-size:calc(1.35 * 2.4vh + 0.9vw); line-height:1.45; max-width:26em; opacity:0; transform:translateY(10px); transition:all 1.2s ease; margin:1.2vh 0; font-weight:400; color:var(--bone); }
+  .ev-line b{ color:var(--ember); font-weight:600; }
+  .ev-line.on{ opacity:1; transform:none; }
+  .ev-src{ font-size:1.5vh; color:var(--faint); letter-spacing:.2em; margin-top:3vh; opacity:0; transition:opacity 1s; }
+  .ev-src.on{ opacity:1; }
+
+  /* S2 flood */
+  #flood{ position:absolute; inset:0; overflow:hidden; }
+  .fl{ position:absolute; white-space:nowrap; font-family:'IBM Plex Mono',monospace; font-size:1.9vh; color:var(--dun); opacity:0; animation:flin 5s linear forwards; }
+  .fl.hot{ color:var(--amber); }
+  @keyframes flin{ 0%{ opacity:0; transform:translateY(3vh);} 12%{opacity:.85;} 80%{opacity:.85;} 100%{ opacity:0; transform:translateY(-4vh);} }
+  .flood-cap{ position:relative; z-index:2; }
+
+  /* big statement cards */
+  .big{ font-size:calc(2.6 * 2.4vh + 1.4vw); font-weight:700; letter-spacing:.04em; line-height:1.04; }
+  .big .x{ color:var(--ember); }
+  .sub{ font-size:2.2vh; color:var(--dun); margin-top:2.5vh; max-width:34em; line-height:1.6; }
+
+  /* code card */
+  .code{ text-align:left; background:#14100C; border:1px solid #3B3122; padding:3vh 3vw; font-family:'IBM Plex Mono',monospace; font-size:1.75vh; line-height:1.65; color:var(--dun); white-space:pre; }
+  .code .k{ color:var(--amber); } .code .s{ color:var(--sky); } .code .c{ color:#57493A; }
+
+  /* live stage */
+  #liveWrap{ position:absolute; inset:0; overflow:hidden; background:#14100C; }
+  #camera{ position:absolute; top:50%; left:50%; width:1440px; height:810px; transform-origin:center center; transition:transform 2.2s cubic-bezier(.5,0,.15,1); }
+  #dash{ width:1440px; height:810px; border:0; pointer-events:none; }
+
+  /* captions */
+  #cap{ position:absolute; left:0; right:0; bottom:5vh; display:flex; justify-content:center; z-index:30; pointer-events:none; }
+  #cap .inner{ background:rgba(8,6,4,.82); border:1px solid #3B3122; border-left:3px solid var(--ember); padding:1.6vh 2.4vw; max-width:64vw; font-size:2.1vh; line-height:1.5; opacity:0; transform:translateY(8px); transition:all .6s ease; text-align:left; }
+  #cap .inner.on{ opacity:1; transform:none; }
+  #cap .lab{ font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.26em; font-size:1.4vh; color:var(--ember); margin-bottom:.4vh; }
+  #cap q{ font-style:italic; color:var(--bone); quotes:'"' '"'; }
+  #cap .m{ font-family:'IBM Plex Mono',monospace; color:var(--amber); }
+
+  /* embers */
+  .ember{ position:absolute; bottom:-2vh; width:3px; height:3px; border-radius:50%; background:var(--ember); opacity:0; animation:rise linear infinite; }
+  @keyframes rise{ 0%{ opacity:0; transform:translateY(0);} 15%{ opacity:.7;} 100%{ opacity:0; transform:translateY(-105vh) translateX(4vw);} }
+
+  /* countdown + end */
+  #count{ font-family:'IBM Plex Mono',monospace; font-size:6vh; color:var(--faint); }
+  .end-apis{ font-family:'IBM Plex Mono',monospace; font-size:1.9vh; color:var(--dun); margin-top:3vh; }
+  .end-honest{ font-size:1.7vh; color:var(--faint); margin-top:4vh; font-style:italic; }
+  .badge-row{ display:flex; gap:1.2vw; margin-top:3vh; justify-content:center; }
+  .tbadge{ border:1px solid #3B3122; padding:.7vh 1.2vw; font-family:'IBM Plex Mono',monospace; font-size:1.6vh; color:var(--dun); }
+  .tbadge b{ color:#A3B36B; }
+
+  #hint{ position:absolute; bottom:1.2vh; right:1.5vw; font-family:'IBM Plex Mono',monospace; font-size:1.4vh; color:#3B3122; z-index:40; }
+
+  /* teleprompter (N to toggle) */
+  #vo{ position:absolute; top:1.6vh; left:50%; transform:translateX(-50%); z-index:45;
+    max-width:70vw; background:rgba(8,6,4,.88); border:1px solid #3B3122;
+    border-top:2px solid var(--sky); padding:1.2vh 2vw; display:none; text-align:center; }
+  #vo.on{ display:block; }
+  #vo .lab{ font-family:'Barlow Condensed',sans-serif; text-transform:uppercase;
+    letter-spacing:.3em; font-size:1.2vh; color:var(--sky); margin-bottom:.4vh; }
+  #vo .line{ font-size:2vh; line-height:1.5; color:var(--bone); }
+  #vo .line em{ color:var(--amber); font-style:normal; }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+<div id="frame"><div id="screen">
+  <div id="progress"></div>
+
+  <!-- S0 countdown -->
+  <section class="scene on" id="s0">
+    <div class="disp" style="font-size:3vh; letter-spacing:.4em; color:var(--ember)">Beacon</div>
+    <div id="count" style="margin-top:3vh">●</div>
+    <div class="sub">autoplays — press space to pause</div>
+  </section>
+
+  <!-- S1 evidence -->
+  <section class="scene" id="s1">
+    <div class="ev-line" id="ev1">In the 2025 Eaton fire, <b>16 of the 19 people who died</b> were disabled, elderly, or had limited mobility.</div>
+    <div class="ev-line" id="ev2">All were in an area where the first evacuation order came <b>more than nine hours</b> after the fire started.</div>
+    <div class="ev-line" id="ev3">One resident made <b>three calm 911 calls</b>, repeating his address, saying two disabled people were in the house.<br>The right asset was never sent.</div>
+    <div class="ev-src disp" id="evsrc">Public reporting, 2025 · He was calm — and calm was the problem</div>
+  </section>
+
+  <!-- S2 flood -->
+  <section class="scene" id="s2">
+    <div id="flood"></div>
+    <div class="flood-cap">
+      <div class="big">EVERY MESSAGE<br>SOUNDS URGENT.</div>
+      <div class="sub">When an evacuation order goes out, the support line floods. Buried in the noise: the people who actually cannot leave.</div>
+    </div>
+  </section>
+
+  <!-- S3 thesis -->
+  <section class="scene" id="s3">
+    <div class="big">TONE <span class="x">≠</span> NEED.</div>
+    <div class="sub">A distress classifier ranks the loudest message first.<br>BEACON reads what kind of help is needed — and ignores how loud it sounds.</div>
+  </section>
+
+  <!-- S4 code -->
+  <section class="scene" id="s4">
+    <div class="code">
+<span class="c"># The LLM extracts facts. It never touches this function.</span>
+<span class="k">def</span> route(facts, fire_eta):
+    <span class="k">if</span> facts.physically_trapped <span class="k">or</span> facts.injuries_reported:
+        <span class="k">return</span> <span class="s">"fire_rescue"</span>
+    evac_need = EVAC_MINUTES[facts.mobility]      <span class="c"># wheelchair: 45 min</span>
+    <span class="k">if</span> <span class="k">not</span> facts.has_vehicle: evac_need += <span class="s">15</span>
+    <span class="k">if</span> fire_eta - evac_need &lt; <span class="s">0</span>:                 <span class="c"># won't make it out</span>
+        <span class="k">return</span> <span class="s">"transport_assist"</span>
+    ...</div>
+    <div class="sub">Twenty-five lines. Deterministic. Auditable.<br>"People with disabilities require more time to evacuate" — made computable.</div>
+  </section>
+
+  <!-- S5 live -->
+  <section class="scene" id="s5">
+    <div id="liveWrap"><div id="camera"><iframe id="dash" src="/dashboard" title="live dashboard"></iframe></div></div>
+  </section>
+
+  <!-- S7 close -->
+  <section class="scene" id="s7">
+    <div class="big" style="font-size:calc(1.9*2.4vh + 1vw)">ROUTED ON WHAT YOU NEED.<br><span class="x">NOT HOW YOU SOUND.</span></div>
+    <div class="end-apis">Zendesk Support · Guide · Side Conversations &nbsp;+&nbsp; OpenAI structured extraction &nbsp;+&nbsp; 25 lines of rules</div>
+    <div class="badge-row">
+      <span class="tbadge"><b>51/51</b> tests passing</span>
+      <span class="tbadge"><b>0</b> network needed to demo</span>
+      <span class="tbadge">every dispatch has a <b>receipt</b></span>
+    </div>
+    <div class="end-honest">The finding is from the Eaton fire. The town, names, and messages in this demo are fictional.</div>
+  </section>
+
+  <div id="cap"><div class="inner" id="capInner"><div class="lab" id="capLab"></div><div id="capText"></div></div></div>
+  <div id="vo"><div class="lab">Narration</div><div class="line" id="voLine"></div></div>
+  <div id="hint">space pause · R restart · N script · V voiceover</div>
+</div></div>
+
+<script>
+// ---------- tiny timeline engine ----------
+const $ = (id) => document.getElementById(id);
+let t = -3.2, playing = true, fired = new Set();
+const DUR = 122;
+
+function show(id){ document.querySelectorAll('.scene').forEach(s=>s.classList.remove('on')); $(id).classList.add('on'); }
+function cap(lab, html, hold=6){
+  $('capLab').textContent = lab; $('capText').innerHTML = html;
+  $('capInner').classList.add('on');
+  clearTimeout(cap._t); cap._t = setTimeout(()=> $('capInner').classList.remove('on'), hold*1000);
+}
+function camera(x, y, scale){
+  $('camera').style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(${scale})`;
+}
+const api = (p, m='POST') => fetch(p, {method:m}).catch(()=>{});
+
+// embers for dark scenes
+for (let i=0;i<26;i++){
+  const e = document.createElement('div'); e.className='ember';
+  e.style.left = (Math.random()*100)+'vw';
+  e.style.animationDuration = (7+Math.random()*8)+'s';
+  e.style.animationDelay = (Math.random()*9)+'s';
+  $('s1').appendChild(e.cloneNode()); $('s3').appendChild(e);
+}
+
+// flood messages
+const FLOOD = [
+  "IS MY DEDUCTIBLE WAIVED?? I NEED AN ANSWER NOW!!!",
+  "URGENT!!! what documents do I need to file??",
+  "HELP the sky is orange and I can't find my policy number!!!",
+  "PANICKING — do I get a rental car covered??",
+  "claim status?? PLEASE respond",
+  "URGENT what's my coverage limit I need to know NOW",
+  "when can we return home???",
+  "HELP ME the alerts keep going off!!!",
+  "My son and I both use wheelchairs. We're at 41 Cedar Canyon Rd.",
+];
+function spawnFlood(){
+  const host = $('flood'); host.innerHTML='';
+  FLOOD.forEach((m,i)=>{
+    const d = document.createElement('div'); d.className = 'fl' + (i===8 ? ' hot' : '');
+    d.textContent = m;
+    d.style.left = (4 + (i*37)%72) + '%';
+    d.style.top = (8 + (i*23)%78) + '%';
+    d.style.animationDelay = (i*0.55)+'s';
+    host.appendChild(d);
+  });
+}
+
+// find a case id by requester inside the live app
+async function findCase(name){
+  try{
+    const d = await (await fetch('/api/state')).json();
+    const c = d.cases.find(x => x.requester_name === name);
+    return c && c.id;
+  }catch(e){ return null; }
+}
+
+// ---------- the shot list ----------
+const STEPS = [
+  // S0 countdown handled by clock; S1 evidence
+  [0,   () => { show('s1'); }],
+  [0.6, () => $('ev1').classList.add('on')],
+  [5.4, () => $('ev2').classList.add('on')],
+  [10.2,() => $('ev3').classList.add('on')],
+  [15.6,() => $('evsrc').classList.add('on')],
+
+  [19,  () => { show('s2'); spawnFlood(); }],
+  [27,  () => show('s3')],
+  [33,  () => show('s4')],
+
+  // S5 — live product, choreographed
+  [43,  async () => { show('s5'); camera(0,0,1);
+        await api('/api/reset');
+        cap('Live — not a mockup', 'This is the running product: real tickets, real routing, polling real state every two seconds.'); }],
+  [46,  () => api('/api/simulate')],
+  [49,  () => cap('The flood, replayed', 'Thirty messages stream in. Watch the gray feed fill — and watch what <i>doesn’t</i> reach the dispatch lanes.')],
+  [56,  () => { api('/api/seed/demo/1');
+        cap('Beat 1 — the loudest message', '<q>IS MY DEDUCTIBLE WAIVED?? I NEED AN ANSWER NOW!!!</q> — answered from the Zendesk Guide knowledge base in under a second. It never touches a human.'); }],
+  [64,  () => { api('/api/seed/demo/2');
+        cap('Beat 2 — the calm one', '<q>My son and I both use wheelchairs. The house next door is on fire. I’ve called twice.</q> No exclamation marks.'); }],
+  [68,  () => { camera(-320,120,1.55);
+        cap('The equation', 'Fire ETA <span class="m">18</span> − wheelchair evac need <span class="m">45</span> = <span class="m">−27 minutes</span>. They will not make it out alone. Transport is dispatched — a lift-equipped van, not a fire engine.', 8); }],
+  [77,  () => { camera(0,0,1); api('/api/seed/demo/3');
+        cap('Beat 3 — actually trapped', '<q>Road out of Miner’s Bend is blocked by flames.</q> Different need — different asset: fire/rescue.'); }],
+  [84,  () => { api('/api/seed/demo/4');
+        cap('Beat 4 — en español', '<q>Estamos atrapados… las llamas bloquean la salida.</q> The people most likely to be missed don’t always panic in English.'); }],
+  [91,  () => { api('/api/fire/advance');
+        cap('The fire advances', 'Every open equation recomputes. Margins shrink on screen. The math keeps arguing for the quiet cases.'); }],
+  [97,  () => { camera(-330,-190,1.5);
+        cap('Tone ≠ need — measured', 'Every dot is a message: how loud it sounds vs how urgent it is. The flood lands top-left. The wheelchair user is alone, bottom-right. BEACON routes on the x-axis only.', 8); }],
+
+  // S6 — the receipt (inside live scene)
+  [106, async () => { camera(0,0,1);
+        const id = await findCase('Harriet Baugh');
+        const fr = $('dash').contentWindow;
+        if (id && fr && fr.openReceipt) fr.openReceipt(id);
+        camera(0,40,1.35);
+        cap('Every dispatch has a receipt', 'Extracted facts → the rule that fired → the equation with live values → the crew paged → the full timeline → the Zendesk ticket. The model never decides. The receipt proves it.', 9); }],
+
+  [117, () => show('s7')],
+];
+
+// ---------- teleprompter (N to toggle) — mirrors NARRATION.md ----------
+const VO = [
+  [1,   "Sixteen of the nineteen people who died in the Eaton fire were disabled, elderly, or had limited mobility."],
+  [7,   "The first evacuation order didn't come for more than nine hours."],
+  [12,  "One man called 911 three times. Calmly. He gave his address. He said there were two disabled people in the house."],
+  [17,  "The right help never came."],
+  [20,  "When an evacuation order goes out, the support line floods. Every message sounds urgent — and systems that rank by urgency serve the loudest first."],
+  [28,  "But tone is not need. The loudest message here is a billing question. The quietest is two people who cannot leave."],
+  [34,  "So BEACON never lets the AI decide. The model extracts facts — twenty-five lines of deterministic Python make the call. “People with disabilities need more time to evacuate” isn’t a finding on a slide here. It’s a variable."],
+  [44,  "This is the live product. Real tickets, real routing — no mockups."],
+  [49,  "Thirty messages hit the queue. Watch the gray feed absorb the flood."],
+  [56,  "The loudest message in the pile: a deductible question, in all caps. Answered from the Zendesk knowledge base in under a second. No human ever sees it."],
+  [64,  "Now the calm one. “My son and I both use wheelchairs. The house next door is on fire.” No exclamation marks."],
+  [69,  "Fire arrives in eighteen minutes. A wheelchair evacuation takes forty-five. <em>Minus twenty-seven</em> — they will not make it out alone. So BEACON sends a lift-equipped van, not a fire engine. The right asset."],
+  [77,  "“Road out of Miner’s Bend is blocked by flames.” Different need — different team. Fire and rescue."],
+  [84,  "And in Spanish — <em>estamos atrapados</em> — because the people most likely to be missed don’t always panic in English."],
+  [91,  "The fire advances. Every open equation recomputes, live."],
+  [98,  "Here’s the whole argument in one chart: how loud each message sounds, against how urgent it actually is. The flood lands top-left — loud, and fine. The wheelchair user is alone in the bottom-right — calm, and critical. BEACON routes on the horizontal axis only."],
+  [107, "And every dispatch prints a receipt. The facts the model extracted. The rule that fired. The equation, with live values. The crew that was paged. The AI never decides who gets rescued — and this is the proof."],
+  [118, "Routed on what you need. Not how you sound. Zendesk Support, Guide, and Side Conversations. Fifty-one tests passing. Zero network needed to demo."],
+  [123, "The finding is from the Eaton fire. The town on this screen is fictional. The problem is not."],
+];
+let voOn = false, voIdx = -1;
+function tickVO(){
+  if (!voOn) return;
+  let idx = -1;
+  for (let i = 0; i < VO.length; i++) if (t >= VO[i][0]) idx = i;
+  if (idx !== voIdx){ voIdx = idx; $('voLine').innerHTML = idx >= 0 ? VO[idx][1] : "…"; }
+}
+
+// ---------- AI voiceover track (V to toggle) ----------
+// Plays /static/vo/beacon-narration.wav segment-by-segment: each beat starts
+// at its film cue and pauses at the next silence boundary (vo-cues.json is
+// generated by silence-scanning the PCM), so narration never drifts ahead.
+let voAudio = null, voCueData = null, voSeg = -1, voTrackOn = false;
+async function toggleVoiceover(){
+  voTrackOn = !voTrackOn;
+  if (voTrackOn && !voAudio){
+    try{
+      voAudio = new Audio('/static/vo/beacon-narration.wav');
+      voCueData = await (await fetch('/static/vo-cues.json')).json();
+    }catch(e){ voTrackOn = false; return; }
+  }
+  if (!voTrackOn && voAudio) voAudio.pause();
+}
+function tickVOTrack(){
+  if (!voTrackOn || !voAudio || !voCueData) return;
+  const cues = voCueData.cues;
+  let idx = -1;
+  for (let i = 0; i < cues.length; i++) if (t >= cues[i].film) idx = i;
+  if (idx < 0) return;
+  const segEnd = idx + 1 < cues.length ? cues[idx + 1].audio : voCueData.duration + 1;
+  if (idx !== voSeg){
+    voSeg = idx;
+    if (Math.abs(voAudio.currentTime - cues[idx].audio) > 1.2) voAudio.currentTime = cues[idx].audio;
+    voAudio.play().catch(()=>{});
+  } else if (!voAudio.paused && voAudio.currentTime >= segEnd){
+    voAudio.pause();                       // wait at the silence for the next film cue
+  } else if (voAudio.paused && playing && voAudio.currentTime < segEnd - 0.15){
+    voAudio.play().catch(()=>{});          // resume after a Space un-pause
+  }
+}
+
+// ---------- clock (wall-time based — immune to tab throttling) ----------
+let lastTick = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  const dt = Math.min(1.5, (now - lastTick) / 1000);
+  lastTick = now;
+  if (!playing) return;
+  t += dt;
+  if (t < 0){ $('count').textContent = Math.ceil(-t); }
+  else {
+    if ($('s0').classList.contains('on') && t >= 0) show('s1');
+    for (const [at, fn] of STEPS){
+      const key = 'k'+at;
+      if (t >= at && !fired.has(key)){ fired.add(key); fn(); }
+    }
+    $('progress').style.width = Math.min(100, (t/DUR)*100) + '%';
+    tickVO();
+    tickVOTrack();
+  }
+}, 100);
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space'){
+    e.preventDefault(); playing = !playing;
+    if (!playing && voAudio) voAudio.pause();
+  }
+  if (e.key.toLowerCase() === 'r') location.reload();
+  if (e.key.toLowerCase() === 'n'){
+    voOn = !voOn; voIdx = -1;
+    $('vo').classList.toggle('on', voOn);
+  }
+  if (e.key.toLowerCase() === 'v') toggleVoiceover();
+});
+// test hook
+window.FILM = { now: () => t, goto: (sec) => { t = sec; } };
+</script>
+</body>
+</html>

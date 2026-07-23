@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BEACON — Cedar Canyon Incident Command</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='82' font-size='82'%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14100C; --panel:#1E1813; --panel2:#251D14; --line:#3B3122; --line-soft:#2B2419;
+    --bone:#EFE6D8; --dun:#9C8E77; --faint:#70634E;
+    --ember:#FF5C2E; --amber:#FFB020; --sky:#7DB2E8; --moss:#A3B36B;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{
+    background:var(--ink); color:var(--bone);
+    font-family:'Barlow',system-ui,sans-serif; font-size:14px;
+    display:grid; grid-template-rows:auto 1fr auto; overflow:hidden;
+  }
+  .mono{ font-family:'IBM Plex Mono',ui-monospace,monospace; }
+  .disp{ font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.06em; }
+
+  /* ---------- header ---------- */
+  header{
+    display:flex; align-items:stretch; gap:0; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#1A1510,#14100C);
+  }
+  .brand{ padding:10px 18px 8px; border-right:1px solid var(--line-soft); }
+  .brand .eyebrow{ font-size:10px; color:var(--ember); letter-spacing:.28em; }
+  .brand h1{ font-size:30px; line-height:1; font-weight:700; }
+  .brand h1 small{ font-size:13px; font-weight:500; color:var(--dun); letter-spacing:.12em; }
+  .brand .mode{ font-size:10px; color:var(--faint); font-family:'IBM Plex Mono',monospace; margin-top:2px; }
+
+  .metrics{ display:flex; align-items:stretch; flex:1; }
+  .metric{ padding:10px 16px; border-right:1px solid var(--line-soft); min-width:86px; }
+  .metric .k{ font-size:9px; color:var(--faint); letter-spacing:.22em; text-transform:uppercase; }
+  .metric .v{ font-family:'IBM Plex Mono',monospace; font-size:21px; font-weight:600; margin-top:2px; }
+  .metric .v .unit{ font-size:11px; color:var(--dun); font-weight:400; }
+  .metric.eta .v{ color:var(--ember); }
+
+  .controls{ display:flex; align-items:center; gap:6px; padding:0 14px; }
+  .btn{
+    font-family:'Barlow Condensed',sans-serif; text-transform:uppercase; letter-spacing:.1em;
+    font-size:12px; font-weight:600; color:var(--bone); background:var(--panel2);
+    border:1px solid var(--line); padding:7px 12px; cursor:pointer; border-radius:2px;
+  }
+  .btn:hover{ border-color:var(--dun); }
+  .btn:focus-visible{ outline:2px solid var(--amber); outline-offset:1px; }
+  .btn.hot{ border-color:var(--ember); color:var(--ember); }
+  .btn.key::after{ content:attr(data-key); margin-left:7px; font-family:'IBM Plex Mono',monospace;
+    font-size:10px; color:var(--faint); border:1px solid var(--line); padding:0 4px; border-radius:2px; }
+
+  /* ---------- main ---------- */
+  main{ display:grid; grid-template-columns:minmax(0,4fr) minmax(0,3fr); gap:12px; padding:12px; min-height:0; }
+  .panel{ background:var(--panel); border:1px solid var(--line-soft); border-radius:3px; min-height:0; }
+  .panel-h{ display:flex; justify-content:space-between; align-items:baseline;
+    padding:8px 12px 6px; border-bottom:1px solid var(--line-soft); }
+  .panel-h .t{ font-size:12px; font-weight:600; letter-spacing:.18em; }
+  .panel-h .s{ font-size:10px; color:var(--faint); font-family:'IBM Plex Mono',monospace; }
+
+  .map-wrap{ position:relative; display:flex; flex-direction:column; }
+  .map-wrap svg{ width:100%; height:100%; display:block; }
+  #mapHost{ flex:1; min-height:0; }
+  .pager{
+    position:absolute; bottom:10px; right:10px; width:260px;
+    background:rgba(20,16,12,.92); border:1px solid var(--line); border-radius:2px;
+    padding:8px 10px; font-family:'IBM Plex Mono',monospace; font-size:11px;
+  }
+  .pager .k{ font-size:9px; color:var(--faint); letter-spacing:.22em; margin-bottom:4px; }
+  .pager .row{ color:var(--dun); padding:1.5px 0; }
+  .pager .row b{ color:var(--amber); font-weight:600; }
+
+  .rail{ display:flex; flex-direction:column; gap:12px; min-height:0; overflow-y:auto; scrollbar-width:thin; }
+
+  /* lanes */
+  .lanes{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .lane{ border-top:2px solid var(--lane-c); }
+  .lane[data-lane="fire_rescue"]{ --lane-c:var(--ember); }
+  .lane[data-lane="transport_assist"]{ --lane-c:var(--amber); }
+  .lane[data-lane="accessible_shelter"]{ --lane-c:var(--sky); }
+  .lane .panel-h .t{ color:var(--lane-c); }
+  .loadbar{ height:3px; background:var(--line-soft); margin:0 12px; }
+  .loadbar i{ display:block; height:100%; background:var(--lane-c); transition:width .6s ease; }
+  .loadbar.sat i{ background:var(--ember); }
+  .lane .cap{ font-size:9px; color:var(--faint); font-family:'IBM Plex Mono',monospace; padding:3px 12px 5px; }
+  .cards{ padding:0 8px 8px; max-height:30vh; overflow-y:auto; scrollbar-width:thin; }
+
+  .case{
+    border:1px solid var(--line-soft); border-left:3px solid var(--lane-c,var(--line));
+    background:var(--panel2); padding:7px 9px; margin-top:7px; cursor:pointer;
+    border-radius:2px; animation:arrive .45s ease both;
+  }
+  .case:hover,.case.hl{ border-color:var(--dun); }
+  .case .who{ font-weight:600; font-size:13px; display:flex; justify-content:space-between; gap:6px; }
+  .case .who .badge{ font-size:9px; letter-spacing:.14em; color:var(--amber);
+    border:1px solid var(--amber); padding:0 4px; border-radius:2px; align-self:center; white-space:nowrap; }
+  .case .loc{ font-size:11px; color:var(--dun); margin-top:1px; }
+  .case .eq{ font-family:'IBM Plex Mono',monospace; font-size:12px; margin-top:4px; color:var(--bone); }
+  .case .eq.neg{ color:var(--ember); font-weight:600; }
+  .case .cf{ font-size:10px; color:var(--faint); font-family:'IBM Plex Mono',monospace; margin-top:3px; }
+  .case .cf b{ color:var(--moss); font-weight:600; }
+  @keyframes arrive{ from{ opacity:0; transform:translateY(-6px);} to{ opacity:1; transform:none;} }
+
+  /* scatter — the signature */
+  .scatter-wrap{ padding:4px 10px 10px; }
+  .scatter-wrap svg{ width:100%; height:190px; display:block; }
+
+  /* feed */
+  .feed{ max-height:22vh; overflow-y:auto; scrollbar-width:thin; padding:4px 8px 8px; }
+  .feed .row{ display:flex; justify-content:space-between; gap:8px; padding:3px 4px;
+    font-size:12px; color:var(--dun); cursor:pointer; border-radius:2px; }
+  .feed .row:hover{ background:var(--panel2); }
+  .feed .row .tag{ font-size:9px; letter-spacing:.1em; color:var(--moss); border:1px solid var(--line);
+    padding:0 4px; border-radius:2px; align-self:center; white-space:nowrap; }
+  .feed .row .msg{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ---------- ticker ---------- */
+  footer{
+    border-top:1px solid var(--line); background:#181310; padding:6px 14px;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--dun);
+    display:flex; gap:14px; align-items:center; white-space:nowrap; overflow:hidden;
+  }
+  footer .lead{ color:var(--ember); letter-spacing:.2em; font-size:9px; }
+  footer #radio{ overflow:hidden; text-overflow:ellipsis; }
+  footer .cursor{ display:inline-block; width:7px; height:12px; background:var(--ember);
+    vertical-align:-2px; animation:blink 1.1s steps(1) infinite; }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  /* ---------- receipt modal (thermal paper) ---------- */
+  .modal-bg{ position:fixed; inset:0; background:rgba(10,8,6,.8); display:flex;
+    align-items:center; justify-content:center; z-index:50; padding:18px; }
+  .hidden{ display:none !important; }
+  .receipt{
+    width:min(480px,100%); max-height:88vh; overflow-y:auto; background:var(--bone); color:#221B12;
+    font-family:'IBM Plex Mono',monospace; font-size:12px; padding:22px 24px 8px; position:relative;
+    box-shadow:0 18px 60px rgba(0,0,0,.6);
+  }
+  .receipt::before,.receipt::after{
+    content:""; position:sticky; display:block; left:0; right:0; height:10px;
+    background:repeating-linear-gradient(90deg,var(--bone) 0 9px,transparent 9px 16px);
+  }
+  .receipt::before{ top:-22px; margin:-22px -24px 12px; transform:translateY(-1px) rotate(180deg); }
+  .receipt::after{ bottom:-8px; margin:14px -24px -8px; }
+  .receipt h2{ font-family:'Barlow Condensed',sans-serif; text-transform:uppercase;
+    letter-spacing:.2em; font-size:19px; text-align:center; }
+  .receipt .sub{ text-align:center; font-size:10px; color:#6B5B44; margin:2px 0 10px; }
+  .receipt hr{ border:none; border-top:1px dashed #B5A78D; margin:10px 0; }
+  .receipt .msgq{ font-style:italic; color:#4A3F2E; }
+  .receipt table{ width:100%; border-collapse:collapse; }
+  .receipt td{ padding:1.5px 0; vertical-align:top; }
+  .receipt td:first-child{ color:#8A7A5E; padding-right:12px; white-space:nowrap; }
+  .receipt .rule-line{ font-weight:600; }
+  .receipt .eqbig{ font-size:14px; font-weight:600; }
+  .receipt .eqbig.neg{ color:#C22F0E; }
+  .receipt .sec{ font-size:9px; letter-spacing:.24em; color:#8A7A5E; margin:10px 0 3px; }
+  .receipt ul{ list-style:none; }
+  .receipt li{ display:flex; gap:8px; }
+  .receipt li .t{ color:#8A7A5E; }
+  .receipt .stamp{
+    position:absolute; top:46px; right:20px; transform:rotate(9deg);
+    border:2px solid #C22F0E; color:#C22F0E; font-weight:600; letter-spacing:.2em;
+    font-size:11px; padding:3px 8px; opacity:.85;
+  }
+  .receipt .actions{ display:flex; gap:8px; justify-content:center; margin-top:12px; }
+  .receipt .actions button{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; background:none; cursor:pointer;
+    border:1px solid #8A7A5E; color:#4A3F2E; padding:5px 12px;
+  }
+  .receipt .actions button:hover{ border-color:#221B12; }
+
+  .empty{ padding:14px 6px 10px; font-size:11px; color:var(--faint);
+    font-family:'IBM Plex Mono',monospace; text-align:center; }
+
+  .case .meta{ display:flex; justify-content:space-between; align-items:center; margin-top:3px; }
+  .case .age{ font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--faint); }
+  .case .age.overdue{ color:var(--ember); font-weight:600; }
+  .case .st{ font-size:9px; letter-spacing:.14em; padding:0 5px; border-radius:2px; }
+  .case .st.ack{ color:var(--moss); border:1px solid var(--moss); }
+
+  .receipt .actions select{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; background:none;
+    border:1px solid #8A7A5E; color:#4A3F2E; padding:5px 6px;
+  }
+  .receipt .status-line{ text-align:center; font-size:11px; letter-spacing:.18em;
+    text-transform:uppercase; margin-top:6px; }
+  .receipt .status-line.resolved{ color:#4A5A28; font-weight:600; }
+  .receipt .status-line.acknowledged{ color:#8A6A0E; font-weight:600; }
+
+  /* zendesk proof view inside the receipt modal */
+  .zd{ background:#fff; border:1px solid #D8DCDF; border-radius:4px; margin-top:8px;
+    font-family:'Barlow',sans-serif; color:#2F3941; overflow:hidden; }
+  .zd .zd-h{ background:#03363D; color:#fff; padding:8px 12px; font-size:12px; font-weight:600; }
+  .zd .zd-b{ padding:10px 12px; font-size:12px; }
+  .zd .zd-row{ display:flex; gap:8px; padding:2px 0; }
+  .zd .zd-row .k{ color:#68737D; min-width:96px; }
+  .zd .zd-tag{ display:inline-block; background:#E9EBED; border-radius:3px;
+    padding:1px 6px; margin-right:4px; font-size:11px; }
+  .zd .zd-note{ background:#FFF8DB; border-left:3px solid #F5CA62; padding:6px 8px;
+    margin-top:6px; font-size:11.5px; white-space:pre-wrap; }
+  .zd .zd-public{ background:#F4F6F8; border-left:3px solid #7DB2E8; padding:6px 8px;
+    margin-top:6px; font-size:11.5px; }
+
+  /* help overlay */
+  .help{ position:fixed; inset:0; background:rgba(10,8,6,.85); z-index:60;
+    display:flex; align-items:center; justify-content:center; }
+  .help .sheet{ background:var(--panel); border:1px solid var(--line); padding:22px 28px;
+    font-family:'IBM Plex Mono',monospace; font-size:13px; min-width:320px; }
+  .help h3{ font-family:'Barlow Condensed',sans-serif; text-transform:uppercase;
+    letter-spacing:.2em; font-size:15px; margin-bottom:12px; color:var(--ember); }
+  .help .k{ display:inline-block; border:1px solid var(--line); padding:0 7px;
+    margin-right:10px; color:var(--amber); min-width:22px; text-align:center; }
+  .help .row{ padding:3px 0; color:var(--dun); }
+
+  ::-webkit-scrollbar{ width:8px; } ::-webkit-scrollbar-thumb{ background:var(--line); }
+
+  @media (max-width:1000px){
+    body{ overflow:auto; }
+    main{ grid-template-columns:1fr; }
+    .metrics{ flex-wrap:wrap; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="eyebrow disp">Incident Command · Cedar Canyon Complex</div>
+      <h1 class="disp">Beacon <small>Evacuation Dispatch</small></h1>
+      <div class="mode" id="modeLine">—</div>
+    </div>
+    <div class="metrics">
+      <div class="metric eta"><div class="k">Fire ETA</div><div class="v" id="fireEta">—</div></div>
+      <div class="metric"><div class="k">Messages</div><div class="v" id="mTotal">0</div></div>
+      <div class="metric"><div class="k">Deflected</div><div class="v" id="mDeflect">0<span class="unit">%</span></div></div>
+      <div class="metric"><div class="k">Flagged</div><div class="v" id="mFlagged">0</div></div>
+      <div class="metric"><div class="k">Pipeline</div><div class="v" id="mMs">0<span class="unit">ms</span></div></div>
+      <div class="metric"><div class="k">Clock</div><div class="v" id="clock">—</div></div>
+    </div>
+    <div class="controls">
+      <button class="btn hot key" data-key="R" onclick="startReplay()" id="replayBtn">Replay incident</button>
+      <button class="btn key" data-key="1" onclick="seedDemo(1)" title="Panicked FAQ">FAQ</button>
+      <button class="btn key" data-key="2" onclick="seedDemo(2)" title="Calm emergency">Calm</button>
+      <button class="btn key" data-key="3" onclick="seedDemo(3)" title="Trapped">Trapped</button>
+      <button class="btn key" data-key="4" onclick="seedDemo(4)" title="Spanish emergency">ES</button>
+      <button class="btn key" data-key="F" onclick="advanceFire()">Fire +</button>
+      <button class="btn" id="soundBtn" onclick="toggleSound()" title="Ping on flagged cases">🔕</button>
+      <button class="btn" onclick="resetIncident()" title="Fresh incident">Reset</button>
+      <button class="btn" onclick="toggleHelp()" title="Keyboard shortcuts">?</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel map-wrap">
+      <div class="panel-h"><span class="t disp">Operations map</span><span class="s" id="windNote">wind NE→SW · perimeter live</span></div>
+      <div id="mapHost"></div>
+      <div class="pager">
+        <div class="k disp">📟 Dispatch pager</div>
+        <div id="pager"><div class="row">standing by</div></div>
+      </div>
+    </section>
+
+    <section class="rail">
+      <div class="lanes">
+        <div class="panel lane" data-lane="fire_rescue">
+          <div class="panel-h"><span class="t disp">Fire / Rescue</span><span class="s" id="cap-fire_rescue">0/0</span></div>
+          <div class="loadbar" id="bar-fire_rescue"><i style="width:0%"></i></div>
+          <div class="cards" id="cards-fire_rescue"></div>
+        </div>
+        <div class="panel lane" data-lane="transport_assist">
+          <div class="panel-h"><span class="t disp">Transport</span><span class="s" id="cap-transport_assist">0/0</span></div>
+          <div class="loadbar" id="bar-transport_assist"><i style="width:0%"></i></div>
+          <div class="cards" id="cards-transport_assist"></div>
+        </div>
+        <div class="panel lane" data-lane="accessible_shelter">
+          <div class="panel-h"><span class="t disp">Shelter</span><span class="s" id="cap-accessible_shelter">0/0</span></div>
+          <div class="loadbar" id="bar-accessible_shelter"><i style="width:0%"></i></div>
+          <div class="cards" id="cards-accessible_shelter"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h">
+          <span class="t disp">Tone ≠ Need</span>
+          <span class="s">how loud it sounds vs how urgent it is — BEACON routes on the x-axis only</span>
+        </div>
+        <div class="scatter-wrap"><svg id="scatter" viewBox="0 0 560 190" role="img"
+          aria-label="Scatter of message tone versus computed need"></svg></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><span class="t disp">Standard / auto-answered</span>
+          <span class="s" id="feedCount">0 · 0</span></div>
+        <div class="feed" id="cards-noise"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span class="lead disp">Radio log</span>
+    <span id="radio">—</span>
+    <span class="cursor"></span>
+  </footer>
+
+  <div id="modal" class="modal-bg hidden">
+    <div class="receipt" id="modalBody"></div>
+  </div>
+
+  <div id="help" class="help hidden" onclick="if(event.target===this)toggleHelp()">
+    <div class="sheet">
+      <h3>Stage controls</h3>
+      <div class="row"><span class="k">R</span>replay incident (30 msgs, ~60s)</div>
+      <div class="row"><span class="k">1</span>panicked FAQ → auto-answer</div>
+      <div class="row"><span class="k">2</span>calm emergency → transport</div>
+      <div class="row"><span class="k">3</span>trapped → fire/rescue</div>
+      <div class="row"><span class="k">4</span>emergencia en español → rescue</div>
+      <div class="row"><span class="k">F</span>advance fire perimeter</div>
+      <div class="row"><span class="k">M</span>toggle dispatch ping</div>
+      <div class="row"><span class="k">?</span>this sheet · <span class="k">Esc</span>close</div>
+    </div>
+  </div>
+
+  <script src="/static/map.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

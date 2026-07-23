@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cedar Canyon Wildfire — Policyholder Assistance</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='82' font-size='82'%3E%F0%9F%9B%9F%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600&display=swap" rel="stylesheet">
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+    background:#F3F0EA; color:#2A2620; font-family:'Barlow',system-ui,sans-serif;
+  }
+  .card{
+    width:100%; max-width:430px; background:#fff; border:1px solid #DDD6C9;
+    border-radius:6px; overflow:hidden; box-shadow:0 8px 30px rgba(42,38,32,.08);
+  }
+  .head{ background:#2A2620; color:#F3F0EA; padding:20px 24px 16px; }
+  .head .agency{ font-family:'Barlow Condensed',sans-serif; text-transform:uppercase;
+    letter-spacing:.3em; font-size:11px; color:#C9A227; }
+  .head h1{ font-size:20px; font-weight:600; margin-top:6px; }
+  .head p{ font-size:13px; color:#B8B0A0; margin-top:2px; }
+  .body{ padding:22px 24px; }
+  .body>p{ font-size:13px; color:#6E675B; margin-bottom:16px; line-height:1.5; }
+  label{ display:block; font-size:13px; font-weight:500; color:#4A443A; margin-bottom:5px; }
+  input,textarea{
+    width:100%; border:1px solid #CFC7B8; border-radius:4px; padding:9px 11px;
+    font:inherit; font-size:14px; color:#2A2620; background:#FDFCF9; margin-bottom:14px;
+  }
+  input:focus,textarea:focus{ outline:2px solid #C9A227; outline-offset:0; border-color:#C9A227; }
+  button{
+    width:100%; background:#2A2620; color:#F3F0EA; border:none; border-radius:4px;
+    padding:11px; font:inherit; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  button:hover{ background:#3B362D; }
+  button:focus-visible{ outline:2px solid #C9A227; outline-offset:2px; }
+  button:disabled{ opacity:.6; cursor:default; }
+  .ok{
+    display:none; margin-top:16px; background:#F1F4E8; border:1px solid #C4CFA5;
+    border-radius:4px; padding:14px; font-size:13px;
+  }
+  .ok.show{ display:block; }
+  .ok b{ color:#4A5A28; }
+  .ok a{ color:#8A7B5E; font-size:11px; }
+  .ok.dispatch{ background:#FBEFE9; border-color:#E4B8A4; }
+  .ok.dispatch b{ color:#A33B12; }
+  .reply{
+    margin-top:10px; background:#fff; border:1px solid #DDD6C9; border-left:3px solid #C9A227;
+    border-radius:4px; padding:10px 12px; font-size:13px; color:#4A443A; line-height:1.5;
+  }
+  .reply .from{ font-size:10px; text-transform:uppercase; letter-spacing:.14em; color:#A39A88; margin-bottom:4px; }
+  .chip{
+    display:inline-block; font-size:11px; font-weight:600; letter-spacing:.06em;
+    padding:2px 8px; border-radius:10px; margin-top:6px;
+  }
+  .chip.rescue{ background:#F7D8CC; color:#A33B12; }
+  .chip.transport{ background:#F7EAC7; color:#8A6A0E; }
+  .chip.shelter{ background:#D9E7F5; color:#2B5D8F; }
+  .fine{ text-align:center; font-size:11px; color:#A39A88; margin-top:14px; }
+</style>
+</head>
+<body>
+  <div>
+    <div class="card">
+      <div class="head">
+        <div class="agency">Meridian Mutual · Crisis Line</div>
+        <h1>Cedar Canyon Wildfire</h1>
+        <p>Policyholder assistance</p>
+      </div>
+      <div class="body">
+        <p>Send us a message and our team will respond. If you or someone with you
+           needs physical help evacuating, tell us where you are.</p>
+        <form id="form">
+          <label for="name">Your name</label>
+          <input id="name" type="text" autocomplete="name" placeholder="Full name" />
+          <label for="message">Message</label>
+          <textarea id="message" rows="5" required placeholder="How can we help?"></textarea>
+          <button id="send" type="submit">Send message</button>
+        </form>
+        <div id="result" class="ok"></div>
+      </div>
+    </div>
+    <p class="fine">Cedar Canyon, CA is fictional. This is a demonstration.</p>
+  </div>
+
+  <script>
+    const form = document.getElementById('form');
+    const esc = (s) => String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+    const TEAM_LABEL = {
+      fire_rescue: ['Fire & rescue crew', 'rescue'],
+      needs_human_review: ['Emergency review team', 'rescue'],
+      transport_assist: ['Evacuation transport', 'transport'],
+      accessible_shelter: ['Accessible shelter intake', 'shelter'],
+    };
+
+    function renderOutcome(c) {
+      const box = document.getElementById('result');
+      const caseLine = `<div style="margin-top:8px"><a href="/dashboard">case #${esc(c.id)} · dispatch dashboard</a></div>`;
+      if (c.dispatch_path === 'auto_answered' && c.auto_answer) {
+        box.className = 'ok show';
+        box.innerHTML = `<b>Answered instantly</b>
+          <div class="reply"><div class="from">Meridian Mutual · automated reply</div>${esc(c.auto_answer)}</div>
+          ${caseLine}`;
+      } else if (TEAM_LABEL[c.dispatch_path]) {
+        const [label, cls] = TEAM_LABEL[c.dispatch_path];
+        const loc = c.facts && c.facts.location_text ? ' to ' + esc(c.facts.location_text) : '';
+        box.className = 'ok dispatch show';
+        box.innerHTML = `<b>Help is being dispatched${loc}</b>
+          <div>Your message was routed on what you need — not how it sounds.</div>
+          <span class="chip ${cls}">${esc(label)} · crew paged</span>
+          ${caseLine}`;
+      } else {
+        box.className = 'ok show';
+        box.innerHTML = `<b>Message received — case #${esc(c.id)}</b>
+          <div>A specialist is reviewing your message.</div>
+          ${caseLine}`;
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('send');
+      const msg = document.getElementById('message').value.trim();
+      if (!msg) return;
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.getElementById('name').value.trim() || 'Anonymous',
+            message: msg,
+          }),
+        });
+        if (!res.ok) throw new Error('service busy — try again in a moment');
+        renderOutcome(await res.json());
+        form.reset();
+      } catch (err) {
+        alert('Could not send: ' + (err.message || err));
+      } finally {
+        btn.disabled = false; btn.textContent = 'Send message';
+      }
+    });
+  </script>
+</body>
+</html>
